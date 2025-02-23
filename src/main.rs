@@ -1,31 +1,32 @@
-use glib;
 use gtk::prelude::*;
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
-use relm4::prelude::{AsyncComponentParts, SimpleAsyncComponent};
-use relm4::{gtk, AsyncComponentSender, RelmApp, RelmWidgetExt};
+use relm4::prelude::{AsyncComponentParts, SimpleAsyncComponent, AsyncComponentSender};
+use relm4::{gtk, RelmApp, RelmWidgetExt};
 use std::env;
 use gtk4::WrapMode;
 
 struct AppModel {
-    text: String,
+    text_view: gtk::TextView,
+    input_buffer: String,
 }
 
 #[derive(Debug)]
 enum AppMsg {
-    SendPrompt(String),
+    UpdateInput(String),
+    SendPrompt,
+    ReceiveResponse(Result<Option<String>, String>),
 }
 
 #[relm4::component(async)]
 impl SimpleAsyncComponent for AppModel {
     type Init = String;
-
     type Input = AppMsg;
     type Output = ();
 
     view! {
         gtk::Window {
-            set_title: Some("Simple app"),
+            set_title: Some("Relm4 Chat"),
             set_default_width: 400,
             set_default_height: 300,
 
@@ -40,7 +41,7 @@ impl SimpleAsyncComponent for AppModel {
                         set_editable: false,
                         set_hexpand: true,
                         set_vexpand: true,
-						set_wrap_mode: WrapMode::Word,
+                        set_wrap_mode: WrapMode::Word,
                     },
                 },
 
@@ -51,78 +52,76 @@ impl SimpleAsyncComponent for AppModel {
 
                     #[name = "entry_field"]
                     gtk::Entry {
-                        set_placeholder_text: Some("Enter text"),
+                        set_placeholder_text: Some("Enter message..."),
                         set_hexpand: true,
-                    },
-                    #[name = "submit_button"]
-                    gtk::Button {
-                        set_label: "Submit",
-                        connect_clicked => AppMsg::SendPrompt("hello".to_string()),
+                        connect_changed[sender] => move |entry| {
+                            sender.input(AppMsg::UpdateInput(entry.text().to_string()));
+                        }
                     },
 
+                    gtk::Button {
+                        set_label: "Send",
+                        connect_clicked => AppMsg::SendPrompt,
+                    },
                 }
             }
         }
     }
 
-    // Initialize the UI.
     async fn init(
-        text: Self::Init,
+        init_text: Self::Init,
         root: Self::Root,
         sender: AsyncComponentSender<Self>,
-    ) -> AsyncComponentParts<Self> {
-        let model = AppModel { text };
-
-        // Insert the macro code generation here
+    ) -> AsyncComponentParts<Self> {        
         let widgets = view_output!();
-        let entry_field = widgets.entry_field.clone();
-        let text_view = widgets.text_view.clone();
-        widgets.submit_button.connect_clicked(move |_| {
-            let prompt = entry_field.text().to_string();
 
-            let buffer = text_view.buffer().clone();
-            let mut end_iter = buffer.end_iter();
-            buffer.insert(&mut end_iter, &format!("User input: {}\n", prompt));
-			let text_view = text_view.clone();
-            // println!("User input: {}", prompt);
-            glib::spawn_future_local(async move {
-                let response = get_llm_response(&prompt).await;
-				let buffer = text_view.buffer();
-            	let mut end_iter = buffer.end_iter();
-                match response {
-                    Ok(Some(response_text)) => {
-                        let msg = &format!("LLM response: {}\n", response_text);
-                        buffer.insert(&mut end_iter, msg);
-                        // println!("LLM response: {}", msg);
-                    }
-                    Ok(None) => {
-						let msg = &String::from("No response received");
-						buffer.insert(&mut end_iter, msg);
-                        println!("{}", msg);
-                    }
-                    Err(e) => {
-						let msg = &format!("Error: {}", e);
-						buffer.insert(&mut end_iter, msg);
-                        println!("{}", msg);
-                        // Handle the case where no response is received	
-                    }
-                }
-				let end_mark = buffer.create_mark(None, &buffer.end_iter(), false);
-                text_view.scroll_to_mark(&end_mark, 0.0, true, 0.0, 0.0);
-            });
-        });
-        //widgets.text_view
+		let model = AppModel {
+            text_view: widgets.text_view.clone(),
+            input_buffer: init_text,
+        };
 
         AsyncComponentParts { model, widgets }
     }
 
-    async fn update(&mut self, msg: Self::Input, _sender: AsyncComponentSender<Self>) {
+    async fn update(&mut self, msg: Self::Input, sender: AsyncComponentSender<Self>) {
         match msg {
-            AppMsg::SendPrompt(text) => {
-                // println!("Received prompt: {}", text);
+            AppMsg::UpdateInput(text) => {
+                self.input_buffer = text;
+            }
+            AppMsg::SendPrompt => {
+                let prompt = self.input_buffer.clone();
+                let buffer = self.text_view.buffer().clone();
+                
+                // Clear input
+                self.input_buffer.clear();
+                sender.input(AppMsg::UpdateInput(String::new()));
+                
+                // Add user message to history
+                append_to_buffer(&buffer, (&format!("You: {}\n", prompt).to_string()).to_owned());
+                
+                tokio::spawn(async move {
+                    let result = get_llm_response(&prompt).await
+                        .map_err(|e| e.to_string());
+                    sender.input(AppMsg::ReceiveResponse(result));
+                });
+            }
+            AppMsg::ReceiveResponse(response) => {
+				let buffer = self.text_view.buffer().clone();
+                append_to_buffer(&buffer, match response {
+                    Ok(Some(text)) => format!("AI: {}\n", text),
+                    Ok(None) => "AI: No response\n".into(),
+                    Err(e) => format!("Error: {}\n", e),
+                });
+				let end_mark = buffer.create_mark(None, &buffer.end_iter(), false);
+                self.text_view.scroll_to_mark(&end_mark, 0.0, true, 0.0, 0.0);
             }
         }
     }
+}
+
+fn append_to_buffer(buffer: &gtk::TextBuffer, text: String) {
+	let mut end_iter = buffer.end_iter();
+	buffer.insert(&mut end_iter, &text);
 }
 
 fn main() {
@@ -152,6 +151,7 @@ async fn get_llm_response(
     );
 
     let result = client.chat_completion(req).await?;
+	// println!("Received response from LLM: {:?}", result.choices[0].message.content.clone());
 
     Ok(result.choices[0].message.content.clone())
 }
