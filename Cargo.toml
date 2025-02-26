@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.39"
+deepseek_rs = "0.1.4"
 glib = "0.20.9"
 gtk4 = "0.9.6"
 openai-api-rs = "5.2.6"
