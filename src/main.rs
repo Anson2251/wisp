@@ -1,50 +1,19 @@
 use gtk::prelude::*;
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
-use relm4::factory::{FactoryComponent, FactorySender, FactoryVecDeque};
+use relm4::factory::FactoryVecDeque;
 use relm4::prelude::{
-    AsyncComponentParts, AsyncComponentSender, DynamicIndex, SimpleAsyncComponent,
+    AsyncComponentParts, AsyncComponentSender, SimpleAsyncComponent,
 };
 use relm4::{gtk, RelmApp, RelmWidgetExt};
 
 use std::env;
+mod modules;
+use modules::components::MessageBubble;
 
-struct MessageRow {
-    text: String,
-    is_user: bool,
-}
-
-#[relm4::factory]
-impl FactoryComponent for MessageRow {
-    type Init = (String, bool);
-    type Input = ();
-    type Output = ();
-    type CommandOutput = ();
-    type ParentWidget = gtk::Box;
-
-    view! {
-        gtk::Box {
-            set_halign: if self.is_user { gtk::Align::End } else { gtk::Align::Start },
-
-            gtk::Label {
-                set_label: &self.text,
-                set_wrap: true,
-                set_max_width_chars: 40,
-                set_css_classes: &["message-bubble", (if self.is_user { "user-bubble" } else {"llm-bubble"})],
-            },
-        }
-    }
-
-    fn init_model(init: Self::Init, _index: &DynamicIndex, _sender: FactorySender<Self>) -> Self {
-        MessageRow {
-            text: init.0,
-            is_user: init.1,
-        }
-    }
-}
 
 struct AppModel {
-    messages: FactoryVecDeque<MessageRow>,
+    messages: FactoryVecDeque<MessageBubble>,
     scrolled_window: Option<gtk::ScrolledWindow>,
     input_buffer: String,
     chat_messages: Vec<chat_completion::ChatCompletionMessage>,
@@ -194,7 +163,7 @@ impl SimpleAsyncComponent for AppModel {
                 let text = match result {
                     Ok(Some(response)) => response,
                     Ok(None) => "No response".to_string(),
-                    Err(e) => e.to_string(),
+                    Err(e) => format!("ERROR: {}", e.to_string()),
                 };
 
                 self.messages.guard().push_back((text.clone(), false));
@@ -238,7 +207,10 @@ async fn get_llm_response(
 ) -> Result<Option<String>, std::boxed::Box<dyn std::error::Error>> {
     // println!("Sending prompt to LLM: {}", prompt);
     let api_key =
-        env::var("OPENAI_API_KEY").expect("Load Open AI API key from env OPENAI_API_KEY failed");
+        match env::var("OPENAI_API_KEY") {
+            Ok(key) => key,
+            Err(_) => return Err("env OPENAI_API_KEY not set".into()),
+        };
     let client = OpenAIClient::builder()
         .with_endpoint("https://api.siliconflow.cn/v1")
         .with_api_key(api_key.to_string())
