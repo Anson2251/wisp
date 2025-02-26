@@ -2,26 +2,22 @@ use gtk::prelude::*;
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
 use relm4::factory::FactoryVecDeque;
-use relm4::prelude::{
-    AsyncComponentParts, AsyncComponentSender, SimpleAsyncComponent,
-};
+use relm4::prelude::{AsyncComponentParts, AsyncComponentSender, SimpleAsyncComponent};
 use relm4::{gtk, RelmApp, RelmWidgetExt};
 
 use std::env;
 mod modules;
 use modules::components::MessageBubble;
 
-
 struct AppModel {
     messages: FactoryVecDeque<MessageBubble>,
     scrolled_window: Option<gtk::ScrolledWindow>,
-    input_buffer: String,
+    text_entry: Option<gtk::Entry>,
     chat_messages: Vec<chat_completion::ChatCompletionMessage>,
 }
 
 #[derive(Debug)]
 enum AppMsg {
-    UpdateInput(String),
     SendPrompt,
     ReceiveResponse(Result<Option<String>, String>),
 }
@@ -63,9 +59,10 @@ impl SimpleAsyncComponent for AppModel {
                     gtk::Entry {
                         set_placeholder_text: Some("Enter message..."),
                         set_hexpand: true,
-                        connect_changed[sender] => move |entry| {
-                            sender.input(AppMsg::UpdateInput(entry.text().to_string()));
-                        }
+						connect_activate => AppMsg::SendPrompt,
+                        // connect_changed[sender] => move |entry| {
+                        //     sender.input(AppMsg::UpdateInput(entry.text().to_string()));
+                        // }
                     },
 
                     gtk::Button {
@@ -89,7 +86,7 @@ impl SimpleAsyncComponent for AppModel {
         let mut model = AppModel {
             messages,
             scrolled_window: None,
-            input_buffer: String::new(),
+            text_entry: None,
             chat_messages: vec![chat_completion::ChatCompletionMessage {
                 role: chat_completion::MessageRole::system,
                 content: chat_completion::Content::Text(init_text),
@@ -103,20 +100,40 @@ impl SimpleAsyncComponent for AppModel {
         let widgets = view_output!();
 
         model.scrolled_window = Some(widgets.scrolled_window.clone());
+		model.text_entry = Some(widgets.entry_field.clone());
 
         AsyncComponentParts { model, widgets }
     }
 
     async fn update(&mut self, msg: Self::Input, sender: AsyncComponentSender<Self>) {
+        let scroll_to_bottom = || {
+            let scrolled_window = self
+                .scrolled_window
+                .clone()
+                .expect("ScrolledWindow is not initialized!");
+
+			let immediate_scroll = scrolled_window.clone();
+            glib::idle_add_local_once(move || {
+                let adj = immediate_scroll.vadjustment();
+                adj.set_value(adj.upper() - adj.page_size());
+            });
+			
+			// I don't know why this is necessary, but without it, the scroll to bottom cannot
+			// work when sending a message.
+            glib::timeout_add_local_once(std::time::Duration::from_millis(100), move || {
+                let adj = scrolled_window.vadjustment();
+                adj.set_value(adj.upper() - adj.page_size());
+            });
+        };
+
         match msg {
-            AppMsg::UpdateInput(text) => {
-                self.input_buffer = text;
-            }
             AppMsg::SendPrompt => {
-                let text = self.input_buffer.trim().to_string();
+				let text_entry = self.text_entry.clone().expect("TextEntry is not initialized!");
+                let text = text_entry.text().to_string();
                 if text.is_empty() {
                     return;
                 }
+				text_entry.set_text("");
 
                 // Add user message
                 self.messages.guard().push_back((text.clone(), true));
@@ -129,9 +146,10 @@ impl SimpleAsyncComponent for AppModel {
                         tool_call_id: None,
                     });
 
+                scroll_to_bottom();
+
                 // Clear input
-                self.input_buffer.clear();
-                sender.input(AppMsg::UpdateInput(String::new()));
+                // sender.input(AppMsg::UpdateInput(String::new()));
 
                 // Request AI response
                 let history = self.chat_messages.clone();
@@ -150,14 +168,6 @@ impl SimpleAsyncComponent for AppModel {
                         }
                     }
                 });
-
-                // Scroll to bottom
-                let scrolled_window = self
-                    .scrolled_window
-                    .as_ref()
-                    .expect("ScrolledWindow is not initialized!");
-                let adj = scrolled_window.vadjustment();
-                adj.set_value(adj.upper() - adj.page_size());
             }
             AppMsg::ReceiveResponse(result) => {
                 let text = match result {
@@ -177,13 +187,7 @@ impl SimpleAsyncComponent for AppModel {
                         tool_call_id: None,
                     });
 
-                // Scroll to bottom
-                let scrolled_window = self
-                    .scrolled_window
-                    .as_ref()
-                    .expect("ScrolledWindow is not initialized!");
-                let adj = scrolled_window.vadjustment();
-                adj.set_value(adj.upper() - adj.page_size());
+                scroll_to_bottom();
             }
         }
     }
@@ -206,18 +210,17 @@ async fn get_llm_response(
     messages: &Vec<chat_completion::ChatCompletionMessage>,
 ) -> Result<Option<String>, std::boxed::Box<dyn std::error::Error>> {
     // println!("Sending prompt to LLM: {}", prompt);
-    let api_key =
-        match env::var("OPENAI_API_KEY") {
-            Ok(key) => key,
-            Err(_) => return Err("env OPENAI_API_KEY not set".into()),
-        };
+    let api_key = match env::var("OPENAI_API_KEY") {
+        Ok(key) => key,
+        Err(_) => return Err("env OPENAI_API_KEY not set".into()),
+    };
     let client = OpenAIClient::builder()
         .with_endpoint("https://api.siliconflow.cn/v1")
         .with_api_key(api_key.to_string())
         .build()?;
 
     let req = ChatCompletionRequest::new(
-        "meta-llama/Meta-Llama-3.1-8B-Instruct".to_string(),
+        "Qwen/Qwen2.5-7B-Instruct".to_string(),
         messages.clone(),
     );
 
