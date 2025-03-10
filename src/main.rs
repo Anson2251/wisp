@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use gtk::prelude::*;
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
@@ -159,7 +161,7 @@ impl SimpleAsyncComponent for AppModel {
                         Ok(Some(response)) => {
                             sender_clone.input(AppMsg::ReceiveResponse(Ok(Some(response))));
                         }
-                        Ok(None) => {
+                        Ok(_) => {
                             sender_clone
                                 .input(AppMsg::ReceiveResponse(Err("No response".to_string())));
                         }
@@ -172,7 +174,7 @@ impl SimpleAsyncComponent for AppModel {
             AppMsg::ReceiveResponse(result) => {
                 let text = match result {
                     Ok(Some(response)) => response,
-                    Ok(None) => "No response".to_string(),
+                    Ok(_) => "No response".to_string(),
                     Err(e) => format!("ERROR: {}", e.to_string()),
                 };
 
@@ -203,7 +205,10 @@ fn main() {
         &provider,
         gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
-    app.run_async::<AppModel>("".to_string());
+    app.run_async::<AppModel>("
+		You are a helpful LLM assistant, called Qwen, trained by Alibaba Cloud. 
+		The specific version is Qwen2.5-7B-Instruct.
+	".to_string());
 }
 
 async fn get_llm_response(
