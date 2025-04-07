@@ -14,3 +14,4 @@ pulldown-cmark = "0.9.3"
 regex = "1.10.4"
 relm4 = "0.9.1"
 tokio = "1.43.0"
+rusqlite = { version = "0.31.0", features = ["bundled"] }
