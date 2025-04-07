@@ -2,6 +2,7 @@ use gtk::prelude::*;
 use relm4::factory::{FactoryComponent, FactorySender};
 use relm4::prelude::DynamicIndex;
 use relm4::gtk;
+use crate::modules::md2pango;
 
 pub struct MessageBubble {
     text: String,
@@ -27,8 +28,9 @@ impl FactoryComponent for MessageBubble {
             set_halign: if self.is_user { gtk::Align::End } else { gtk::Align::Start },
 
             gtk::Label {
-				#[watch]
-                set_label: &self.text,
+                #[watch]
+                set_use_markup: true,
+                set_label: &md2pango::convert(&self.text).unwrap_or(self.text.clone()).trim(),
                 set_wrap: true,
                 set_max_width_chars: 40,
                 set_css_classes: &["message-bubble", (if self.is_user { "user-bubble" } else {"llm-bubble"})],

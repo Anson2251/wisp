@@ -9,7 +9,8 @@ deepseek_rs = "0.1.4"
 glib = "0.20.9"
 gtk4 = "0.9.6"
 openai-api-rs = "5.2.6"
+openai_api_rust = "0.1.9"
+pulldown-cmark = "0.9.3"
+regex = "1.10.4"
 relm4 = "0.9.1"
 tokio = "1.43.0"
-
-
