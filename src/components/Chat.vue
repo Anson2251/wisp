@@ -1,29 +1,33 @@
 <script lang="ts" setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { NCard, NInput, NButton, NSpace, NH2, NAvatar } from 'naive-ui'
+import { ref, onMounted, watch } from 'vue'
+import { NCard, NInput, NButton, NSpace } from 'naive-ui'
 import MessageBubble from './MessageBubble.vue'
-import { Chat24Regular, Person24Regular } from '@vicons/fluent'
-import { NIcon } from 'naive-ui'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
 onMounted(() => {
   watch(messages, () => {
-    scrollToBottom();
+    autoScrollToBottom();
   }, { deep: true })
 })
 
-function scrollToBottom() {
+const autoScrollThrottle = 48
+
+function autoScrollToBottom(withThrottle = true) {
   if (!messageContainer) {
     const container = (document.getElementById('message-bubbles') as HTMLDivElement);
     if (container) {
-      messageContainer = container.parentElement;
+      messageContainer = (container.parentElement as HTMLDivElement);
     }
   }
   if (messageContainer) {
+    if(messageContainer.scrollTop + messageContainer.clientHeight === messageContainer.scrollHeight) return
+    // if user's viewport not stick to the bottom, ignore
+    if((messageContainer.scrollTop + messageContainer.clientHeight < messageContainer.scrollHeight - autoScrollThrottle) && withThrottle) return
+    console.log(messageContainer.scrollTop + messageContainer.clientHeight, messageContainer.scrollHeight)
     messageContainer.scrollTo({
       top: messageContainer.scrollHeight,
-      // behavior: 'smooth'
+      behavior: 'smooth'
     });
   }
 }
@@ -63,6 +67,8 @@ async function sendMessage() {
   const unlisten = await listen<string>('openai_stream_chunk', (event) => {
     messages.value[botMessageIndex].text += event.payload
   })
+
+  autoScrollToBottom(false)
 
   try {
     const conversationHistory = messages.value.map(msg => ({
