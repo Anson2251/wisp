@@ -1,10 +1,71 @@
 use futures::StreamExt;
 use reqwest::header;
+use rusqlite::{Connection, params};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter};
+
+struct AstCache {
+    conn: Connection,
+}
+
+impl AstCache {
+    fn new() -> Self {
+        let conn = Connection::open_in_memory().expect("Failed to create in-memory SQLite DB");
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS ast_cache (
+                hash TEXT PRIMARY KEY,
+                ast_json TEXT NOT NULL,
+                rendered_html TEXT NOT NULL
+            )",
+            [],
+        ).expect("Failed to create cache table");
+        Self { conn }
+    }
+
+    fn get(&self, hash: &str) -> Option<String> {
+        self.conn
+            .query_row(
+                "SELECT rendered_html FROM ast_cache WHERE hash = ?",
+                [hash],
+                |row| row.get(0),
+            )
+            .ok()
+    }
+
+    fn put(&self, hash: &str, ast_json: &str, rendered_html: &str) {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO ast_cache (hash, ast_json, rendered_html) VALUES (?1, ?2, ?3)",
+            params![hash, ast_json, rendered_html],
+        ).expect("Failed to insert into cache");
+    }
+}
 
 const URL_BASE: &str = "https://api.siliconflow.cn/v1";
 const MODEL: &str = "Qwen/Qwen2.5-7B-Instruct";
+
+fn compute_content_hash(content: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content);
+    format!("{:x}", hasher.finalize())
+}
+
+#[tauri::command]
+fn hash_content(content: String) -> String {
+    compute_content_hash(&content)
+}
+
+#[tauri::command]
+async fn get_cached_render(hash: String) -> Option<String> {
+    let cache = AstCache::new();
+    cache.get(&hash)
+}
+
+#[tauri::command]
+async fn put_cached_render(hash: String, ast_json: String, rendered_html: String) {
+    let cache = AstCache::new();
+    cache.put(&hash, &ast_json, &rendered_html);
+}
 
 #[tauri::command]
 async fn ask_openai_stream(
@@ -66,7 +127,12 @@ async fn ask_openai_stream(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![ask_openai_stream])
+        .invoke_handler(tauri::generate_handler![
+            ask_openai_stream,
+            get_cached_render,
+            hash_content,
+            put_cached_render
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

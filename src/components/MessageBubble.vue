@@ -1,16 +1,7 @@
 <script setup lang="ts">
 import { NCard, NAvatar, NIcon } from 'naive-ui'
-import MarkdownIt from 'markdown-it'
 import { Chat24Regular, Person24Regular } from '@vicons/fluent'
-
-const md = new MarkdownIt({
-  breaks: true, // Convert \n to <br>
-  linkify: true // Autoconvert URL-like text to links
-})
-
-function renderMarkdown(text: string): string {
-  return md.render(text)
-}
+import MarkdownRenderer from './MarkdownRenderer.vue'
 
 defineProps<{
   text: string
@@ -35,7 +26,7 @@ defineProps<{
       padding: '0px 16px',
       overflow: 'auto'
     }">
-      <div class="markdown-content" v-html="renderMarkdown(text)"></div>
+      <MarkdownRenderer :text="text" />
       <template #footer>
         {{ timestamp.toLocaleTimeString() }}
       </template>
@@ -44,40 +35,5 @@ defineProps<{
 </template>
 
 <style scoped>
-.markdown-content p {
-  margin: 0.2em 0;
-}
-
-.markdown-content h1,
-.markdown-content h2,
-.markdown-content h3 {
-  margin: 0.6em 0 0.4em 0;
-}
-
-.markdown-content code {
-  background-color: #f3f3f3;
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-  font-family: monospace;
-}
-
-.markdown-content pre {
-  background-color: #f5f5f5;
-  padding: 1em;
-  border-radius: 4px;
-  overflow-x: auto;
-}
-
-.markdown-content blockquote {
-  border-left: 3px solid #ddd;
-  padding-left: 1em;
-  margin-left: 0;
-  color: #666;
-}
-
-.markdown-content ul,
-.markdown-content ol {
-  padding-left: 1.5em;
-  margin: 0.5em 0;
-}
+/* All markdown styling moved to MarkdownRenderer.vue */
 </style>

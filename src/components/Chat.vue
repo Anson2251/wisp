@@ -1,9 +1,23 @@
 <script lang="ts" setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, provide } from 'vue'
+import { remark } from 'remark'
+import html from 'remark-html'
+import { rehype } from 'rehype'
+import rehypeMermaid from 'rehype-mermaid'
 import { NCard, NInput, NButton, NSpace } from 'naive-ui'
 import MessageBubble from './MessageBubble.vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+
+const markdownProcessor = {
+  remark: remark().use(html),
+  rehype: rehype().use(rehypeMermaid, {
+    strategy: 'img-svg',
+    errorFallback: () => {}
+  })
+}
+
+provide('markdownProcessor', markdownProcessor)
 
 onMounted(() => {
   watch(messages, () => {
