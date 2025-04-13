@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { NLayout, NLayoutHeader, NLayoutContent, NH1 } from 'naive-ui'
 import Chat from './components/Chat.vue'
 </script>
 
@@ -7,15 +6,6 @@ import Chat from './components/Chat.vue'
   <Chat />
 </template>
 
-<style scoped>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #249b73);
-}
-</style>
 <style>
 :root {
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
