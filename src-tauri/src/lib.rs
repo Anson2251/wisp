@@ -2,6 +2,7 @@ mod cache;
 mod api;
 mod utils;
 mod commands;
+mod db;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -9,9 +10,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::ask_openai_stream,
-            commands::get_cached_render,
+            // commands::get_cached_render,
             commands::hash_content,
-            commands::put_cached_render
+            commands::put_cached_render,
+            commands::save_message,
+            commands::get_messages,
+            commands::clear_messages
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

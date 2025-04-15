@@ -7,7 +7,8 @@ export function useOpenAI() {
 
 	const streamResponse = async (
 		messages: any[],
-		onChunk: (chunk: string) => void
+		onChunk: (chunk: string) => void,
+		onFinish: () => void
 	) => {
 		isStreaming.value = true
 		const unlisten = await listen<string>('openai_stream_chunk', (event) => {
@@ -19,6 +20,7 @@ export function useOpenAI() {
 		} finally {
 			unlisten()
 			isStreaming.value = false
+			if(onFinish) onFinish()
 		}
 	}
 

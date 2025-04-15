@@ -32,7 +32,7 @@ async function sendMessage() {
     timestamp: new Date()
   }
   chatStore.addMessage(botMessage)
-  const botMessageIndex = chatStore.messages.length - 1
+  const botMessageId = chatStore.messages[chatStore.messages.length - 1].id
 
   await streamResponse(
     chatStore.messages.map(msg => ({
@@ -40,7 +40,16 @@ async function sendMessage() {
       content: msg.text
     })),
     (chunk) => {
-      chatStore.messages[botMessageIndex].text += chunk
+      const message = chatStore.messages.find(m => m.id === botMessageId)
+      if (message) {
+        message.text += chunk
+      }
+    },
+    () => {
+      // const message = chatStore.messages.find(m => m.id === botMessageId)
+      // if (message) {
+      //   message.text += "\n\n ` `" // TODO: to trigger the final render for the last block
+      // }
     }
   )
 
@@ -52,7 +61,7 @@ async function sendMessage() {
   <div class="chat-container">
     <n-card class="messages-container" content-style="overflow: auto; min-height: 0;">
       <n-space vertical style="height: 100%" id="message-bubbles">
-        <MessageBubble v-for="(message, index) in chatStore.messages" :key="index" :text="message.text"
+        <MessageBubble v-for="message in chatStore.messages" :key="message.id" :text="message.text"
           :sender="message.sender" :timestamp="message.timestamp" />
       </n-space>
     </n-card>

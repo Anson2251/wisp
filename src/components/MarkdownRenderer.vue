@@ -1,71 +1,71 @@
 <script setup lang="ts">
-import { watch, ref, inject } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
+import { ref, computed, watch } from 'vue';
+import { computedAsync } from '@vueuse/core'
+import { useMarkdown, useVueMdastRenderer } from '../composables/useMarkdown';
 
-interface MarkdownProcessor {
-  remark: { process: (text: string) => Promise<{ toString: () => string }> };
-  rehype: { process: (text: string) => Promise<{ toString: () => string }> };
-}
+const {
+  useStreamingMarkdownRenderer,
+  injectMarkdownProcessor
+} = useMarkdown();
+
+type RenderMode = 'html' | 'stream' | 'vnode';
 
 const props = defineProps<{
   text: string
+  mode?: RenderMode
 }>()
 
-const { remark, rehype } = inject<MarkdownProcessor>('markdownProcessor')!
+const mode = props.mode ?? 'html';
+const container = ref<HTMLDivElement | null>(null);
 
-async function hashContent(text: string): Promise<string> {
-  return await invoke<string>('hash_content', { content: text });
+// HTML mode (default)
+const { processMarkdown } = injectMarkdownProcessor();
+const html = computedAsync(async () => {
+  return await processMarkdown(props.text)
+});
+
+// VNode mode
+const VueMdastRenderer = useVueMdastRenderer();
+const content = computed(() => {
+  return VueMdastRenderer(props.text)
+});
+
+// Stream mode
+const toAppend = useStreamingMarkdownRenderer((html) => {
+  if(!container.value) return;
+  container.value.innerHTML += html;
+});
+if(mode === 'stream') {
+  watch(() => props.text, (newText) => {
+    toAppend(newText);
+  });
 }
-
-async function extractAndCacheDiagrams(text: string): Promise<string> {
-  try {
-    // Split text into non-mermaid and mermaid parts
-    const parts = text.split(/```mermaid([\s\S]*?)```/g);
-    let processed = '';
-
-    for (let i = 0; i < parts.length; i++) {
-      if (i % 2 === 0) {
-        // Regular text
-        processed += await remark.process(parts[i]);
-      } else {
-        console.log('cache hit for mermaid');
-        // Mermaid diagram
-        const diagram = parts[i].trim();
-        const hash = await hashContent(diagram);
-        let cached = await invoke<string>('get_cached_render', { hash });
-
-        if (!cached) {
-          // Render and cache if not found
-          let result = await remark.process(`\`\`\`mermaid\n${diagram}\n\`\`\``);
-          result = await rehype.process(result.toString());
-          cached = result.toString();
-          await invoke<void>('put_cached_render', {
-            hash,
-            astJson: diagram,
-            renderedHtml: cached
-          });
-        }
-        processed += cached;
-      }
-    }
-    return processed;
-  } catch (error) {
-    console.error("Error processing diagrams:", error);
-    return text;
-  }
-}
-
-const renderedText = ref("")
-watch(() => props.text, async (newText) => {
-  renderedText.value = await extractAndCacheDiagrams(newText)
-}, { immediate: true })
 </script>
 
 <template>
-  <div class="markdown-content" v-html="renderedText"></div>
+  <div v-if="mode === 'html'" class="markdown-content" v-html="html"></div>
+  <div v-else-if="mode === 'stream'" class="markdown-content" ref="container"></div>
+  <component v-else-if="mode === 'vnode'" :is="content"></component>
 </template>
 
-<style scoped>
+<style>
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+
+}
+
+.markdown-content > div {
+  animation: fade-in 0.5s ease-in-out;
+  width: 100%;
+  height: fit-content;
+}
+
+
 .markdown-content p {
   margin: 0.2em 0;
 }
