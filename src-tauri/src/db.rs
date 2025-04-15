@@ -1,4 +1,4 @@
-use rusqlite::{Connection, params, OptionalExtension};
+use rusqlite::{Connection, params};
 use serde::{Serialize, Deserialize};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
@@ -20,6 +20,7 @@ impl Database {
     pub fn new(app_handle: &AppHandle) -> Result<Self, rusqlite::Error> {
         let app_dir = app_handle.path().app_data_dir()
             .expect("Failed to get app data dir");
+		println!("App dir: {:?}", app_dir);
         std::fs::create_dir_all(&app_dir).expect("Failed to create app data dir");
         let db_path = PathBuf::from(app_dir).join("messages.db");
 
@@ -44,8 +45,8 @@ impl Database {
             .as_secs() as i64;
 
         self.conn.execute(
-            "INSERT INTO messages (text, sender, timestamp) VALUES (?1, ?2, ?3)",
-            params![text, sender, timestamp],
+            "INSERT INTO messages (id, text, sender, timestamp) VALUES (?1, ?2, ?3, ?4)",
+            params![id, text, sender, timestamp],
         )?;
         Ok(())
     }

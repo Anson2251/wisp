@@ -4,6 +4,7 @@ pub struct AstCache {
     conn: Connection,
 }
 
+#[allow(unused)]
 impl AstCache {
     pub fn new() -> Self {
         let conn = Connection::open_in_memory().expect("Failed to create in-memory SQLite DB");

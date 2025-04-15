@@ -2,11 +2,18 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 
-interface Message {
+type Message = {
 	id: string
 	text: string
 	sender: 'user' | 'bot'
 	timestamp: Date
+}
+
+type MessageStored = {
+	id: string
+	text: string
+	sender: string
+	timestamp: number
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -15,30 +22,38 @@ export const useChatStore = defineStore('chat', () => {
 
 	const loadMessages = async () => {
 		try {
-			const loaded = await invoke<Array<{id: string, text: string, sender: string, timestamp: number}>>('get_messages')
+			const loaded = await invoke<MessageStored[]>('get_messages')
 			messages.value = loaded.map(msg => ({
 				...msg,
 				timestamp: new Date(msg.timestamp * 1000),
 				sender: msg.sender as 'user' | 'bot'
 			}))
 		} catch (error) {
-			console.error('Failed to load messages:', error)
+			console.error('[ChatStore] Failed to load messages:', error)
 		}
 	}
 
-	const addMessage = async (message: Omit<Message, 'id'>) => {
+	const saveMessage = async (message: Message) => {
 		try {
-			const id = crypto.randomUUID()
-			const messageWithId = { ...message, id }
 			await invoke('save_message', {
-				id,
+				id: message.id,
 				text: message.text,
 				sender: message.sender,
 				timestamp: Math.floor(message.timestamp.getTime() / 1000)
 			})
+		} catch (error) {
+			console.error('[ChatStore] Failed to save message:', error)
+		}
+	}
+
+	const addMessage = async (message: Omit<Message, 'id'>, store = true) => {
+		try {
+			const id = crypto.randomUUID().toLocaleUpperCase()
+			const messageWithId = { ...message, id }
+			if (store) await saveMessage(messageWithId)
 			messages.value.push(messageWithId)
 		} catch (error) {
-			console.error('Failed to save message:', error)
+			console.error('[ChatStore] Failed to add message:', error)
 		}
 	}
 
@@ -47,7 +62,7 @@ export const useChatStore = defineStore('chat', () => {
 			await invoke('clear_messages')
 			messages.value = []
 		} catch (error) {
-			console.error('Failed to clear messages:', error)
+			console.error('[ChatStore] Failed to clear messages:', error)
 		}
 	}
 
@@ -60,6 +75,7 @@ export const useChatStore = defineStore('chat', () => {
 		userInput,
 		loadMessages,
 		addMessage,
+		saveMessage,
 		clearMessages,
 		clearUserInput
 	}
