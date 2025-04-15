@@ -1,8 +1,8 @@
-use rusqlite::{Connection, params};
-use serde::{Serialize, Deserialize};
+use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
@@ -18,9 +18,11 @@ pub struct Database {
 
 impl Database {
     pub fn new(app_handle: &AppHandle) -> Result<Self, rusqlite::Error> {
-        let app_dir = app_handle.path().app_data_dir()
+        let app_dir = app_handle
+            .path()
+            .app_data_dir()
             .expect("Failed to get app data dir");
-		println!("App dir: {:?}", app_dir);
+        println!("App dir: {:?}", app_dir);
         std::fs::create_dir_all(&app_dir).expect("Failed to create app data dir");
         let db_path = PathBuf::from(app_dir).join("messages.db");
 
@@ -52,25 +54,32 @@ impl Database {
     }
 
     pub fn get_messages(&self) -> Result<Vec<Message>, rusqlite::Error> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, text, sender, timestamp FROM messages ORDER BY timestamp ASC"
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, text, sender, timestamp FROM messages ORDER BY timestamp ASC")?;
 
-        let messages = stmt.query_map([], |row| {
-            Ok(Message {
-                id: row.get(0)?,
-                text: row.get(1)?,
-                sender: row.get(2)?,
-                timestamp: row.get(3)?,
-            })
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
+        let messages = stmt
+            .query_map([], |row| {
+                Ok(Message {
+                    id: row.get(0)?,
+                    text: row.get(1)?,
+                    sender: row.get(2)?,
+                    timestamp: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(messages)
     }
 
     pub fn clear_messages(&self) -> Result<(), rusqlite::Error> {
         self.conn.execute("DELETE FROM messages", [])?;
+        Ok(())
+    }
+
+    pub fn delete_message(&self, id: &str) -> Result<(), rusqlite::Error> {
+        self.conn
+            .execute("DELETE FROM messages WHERE id = ?1", params![id])?;
         Ok(())
     }
 }

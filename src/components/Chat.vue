@@ -74,7 +74,7 @@ onMounted(() => {
       <AutoScrollWrapper ref="autoScrollWrapper" :auto-scroll="true">
         <div class="bubble-container">
         <MessageBubble v-for="message in chatStore.messages" :key="message.id" :text="message.text"
-          :sender="message.sender" :timestamp="message.timestamp" />
+          :sender="message.sender" :timestamp="message.timestamp" :id="message.id"/>
         </div>
       </AutoScrollWrapper>
     </div>

@@ -1,4 +1,4 @@
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 
 pub struct AstCache {
     conn: Connection,
@@ -15,7 +15,8 @@ impl AstCache {
                 rendered_html TEXT NOT NULL
             )",
             [],
-        ).expect("Failed to create cache table");
+        )
+        .expect("Failed to create cache table");
         Self { conn }
     }
 

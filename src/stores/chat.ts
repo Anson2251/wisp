@@ -66,6 +66,15 @@ export const useChatStore = defineStore('chat', () => {
 		}
 	}
 
+	const deleteMessage = async (id: string) => {
+		try {
+			await invoke('delete_message', { id })
+			messages.value = messages.value.filter(msg => msg.id !== id)
+		} catch (error) {
+			console.error('[ChatStore] Failed to delete message:', error)
+		}
+	}
+
 	const clearUserInput = () => {
 		userInput.value = ''
 	}
@@ -77,6 +86,7 @@ export const useChatStore = defineStore('chat', () => {
 		addMessage,
 		saveMessage,
 		clearMessages,
+		deleteMessage,
 		clearUserInput
 	}
 })

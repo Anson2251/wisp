@@ -1,17 +1,32 @@
 <script setup lang="ts">
-import { NCard, NAvatar, NIcon } from 'naive-ui'
-import { Chat24Regular, Person24Regular } from '@vicons/fluent'
+import { NCard, NAvatar, NIcon, NButton, NFlex } from 'naive-ui'
+import { Chat24Regular, Person24Regular, Copy16Regular, Delete16Regular } from '@vicons/fluent'
 import MarkdownRenderer from './MarkdownRenderer.vue'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { useChatStore } from '../stores/chat'
 
-defineProps<{
+const { deleteMessage } = useChatStore()
+
+const props = defineProps<{
   text: string
   sender: 'user' | 'bot'
   timestamp: Date
+  id: string
 }>()
+
+let onContextMenu = () => { }
+
+const copyMessage = () => {
+  writeText(props.text)
+}
+
+const removeMessage = () => {
+  deleteMessage(props.id)
+}
 </script>
 
 <template>
-  <n-space align="start" :wrap-item="false" :style="{
+  <n-flex align="start" :wrap-item="false" :style="{
     flexDirection: sender === 'user' ? 'row-reverse' : 'row',
     alignItems: 'flex-start'
   }">
@@ -25,13 +40,30 @@ defineProps<{
       width: 'fit-content',
       padding: '0px 16px',
       overflow: 'auto'
-    }">
+    }" :oncontextmenu="onContextMenu">
       <MarkdownRenderer :text="text" />
       <template #footer>
-        {{ timestamp.toLocaleTimeString() }}
+        <n-flex align="center">
+          <n-button quaternary :onclick="copyMessage" circle>
+            <template #icon>
+              <n-icon>
+                <Copy16Regular />
+              </n-icon>
+            </template>
+          </n-button>
+          <n-button quaternary :onclick="removeMessage" circle type="error">
+            <template #icon>
+              <n-icon>
+                <Delete16Regular />
+              </n-icon>
+            </template>
+          </n-button>
+          <span style="padding-left: 32px;">{{ timestamp.toLocaleTimeString() }}</span>
+        </n-flex>
+
       </template>
     </n-card>
-  </n-space>
+  </n-flex>
 </template>
 
 <style scoped>
