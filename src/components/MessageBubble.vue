@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NCard, NAvatar, NIcon, NButton, NFlex } from 'naive-ui'
+import { NAvatar, NIcon, NButton, NFlex, NButtonGroup } from 'naive-ui'
 import { Chat24Regular, Person24Regular, Copy16Regular, Delete16Regular } from '@vicons/fluent'
 import MarkdownRenderer from './MarkdownRenderer.vue'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
@@ -14,8 +14,6 @@ const props = defineProps<{
   id: string
 }>()
 
-let onContextMenu = () => { }
-
 const copyMessage = () => {
   writeText(props.text)
 }
@@ -28,44 +26,88 @@ const removeMessage = () => {
 <template>
   <n-flex align="start" :wrap-item="false" :style="{
     flexDirection: sender === 'user' ? 'row-reverse' : 'row',
-    alignItems: 'flex-start'
+    alignItems: 'flex-start',
+    marginBottom: '12px'
   }">
     <n-avatar style="position: sticky; top: 0;">
       <n-icon :component="sender === 'bot' ? Chat24Regular : Person24Regular" />
     </n-avatar>
-    <n-card :bordered="sender === 'user'" size="small" padding="false" :style="{
-      marginLeft: sender === 'user' ? 'auto' : '0',
-      maxWidth: '80%',
-      backgroundColor: sender === 'user' ? '#f0f7ff' : 'transparent',
-      width: 'fit-content',
-      padding: '0px 16px',
-      overflow: 'auto'
-    }" :oncontextmenu="onContextMenu">
-      <MarkdownRenderer :text="text" />
-      <template #footer>
-        <n-flex align="center">
+    <div class="message-bubble" :class="sender">
+      <div class="content">
+        <MarkdownRenderer :text="text" />
+      </div>
+      <div class="footer">
+        <n-button-group class="button-group">
           <n-button quaternary :onclick="copyMessage" circle>
             <template #icon>
-              <n-icon>
-                <Copy16Regular />
-              </n-icon>
+              <n-icon :component="Copy16Regular" />
             </template>
           </n-button>
           <n-button quaternary :onclick="removeMessage" circle type="error">
             <template #icon>
-              <n-icon>
-                <Delete16Regular />
-              </n-icon>
+              <n-icon :component="Delete16Regular" />
             </template>
           </n-button>
-          <span style="padding-left: 32px;">{{ timestamp.toLocaleTimeString() }}</span>
-        </n-flex>
-
-      </template>
-    </n-card>
+        </n-button-group>
+        <span class="timestamp">{{ timestamp.toLocaleTimeString() }}</span>
+      </div>
+    </div>
   </n-flex>
 </template>
 
 <style scoped>
-/* All markdown styling moved to MarkdownRenderer.vue */
+.message-bubble {
+  max-width: 80%;
+  width: fit-content;
+  border-radius: 16px;
+  padding: 12px 16px;
+  margin-left: 12px;
+  margin-right: 12px;
+  transition: all 0.2s ease;
+  position: relative;
+  margin-bottom: 16px;
+
+  --footer-buttons-opacity: 0;
+}
+
+.message-bubble:hover {
+  --footer-buttons-opacity: 1;
+}
+
+.message-bubble.user {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  box-shadow: 0 2px 8px rgba(38, 78, 100, 0.2), 0 1px 4px rgba(13, 62, 90, 0.2);
+  margin-left: auto;
+}
+
+.message-bubble.bot {
+  background: linear-gradient(135deg, #f5f5f5, #eeeeee);
+  box-shadow: 0 2px 8px rgba(76, 76, 76, 0.2), 0 1px 4px rgba(38, 38, 38, 0.1);
+  margin-right: auto;
+}
+
+.content {
+  overflow: auto;
+}
+
+.footer {
+  position: absolute;
+  bottom: -40px;
+  left: -4px;
+  padding-top: 8px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  width: 100%;
+  opacity: var(--footer-buttons-opacity);
+  transition: opacity .1s ease-in;
+}
+
+.timestamp {
+  font-size: 0.8em;
+  margin-left: 16px;
+  margin-right: 8px;
+}
 </style>

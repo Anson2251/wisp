@@ -34,6 +34,7 @@ async function sendMessage() {
   await chatStore.addMessage(botMessage, false)
   const botMessageId = chatStore.messages[chatStore.messages.length - 1].id
 
+  autoScrollWrapper.value?.scrollToBottom(false)
   await streamResponse(
     chatStore.messages.map(msg => ({
       role: msg.sender === 'user' ? 'user' : 'assistant',
@@ -57,8 +58,6 @@ async function sendMessage() {
       // }
     }
   )
-
-  autoScrollWrapper.value?.scrollToBottom(false)
 }
 
 onMounted(() => {
@@ -71,7 +70,7 @@ onMounted(() => {
 <template>
   <div class="chat-container">
     <div class="messages-container">
-      <AutoScrollWrapper ref="autoScrollWrapper" :auto-scroll="true">
+      <AutoScrollWrapper ref="autoScrollWrapper" :auto-scroll="true" :throttle-pixel="64">
         <div class="bubble-container">
         <MessageBubble v-for="message in chatStore.messages" :key="message.id" :text="message.text"
           :sender="message.sender" :timestamp="message.timestamp" :id="message.id"/>
@@ -81,8 +80,8 @@ onMounted(() => {
 
     <div class="input-container">
       <n-input v-model:value="chatStore.userInput" placeholder="Type your message..." @keyup.enter="sendMessage"
-        clearable />
-      <n-button type="primary" @click="sendMessage">Send</n-button>
+        clearable round/>
+      <n-button type="primary" @click="sendMessage" round>Send</n-button>
     </div>
   </div>
 </template>
@@ -105,6 +104,7 @@ onMounted(() => {
   grid-template-columns: 1fr auto;
   gap: 8px;
   padding: 8px;
+  align-items: center;
 }
 
 .bubble-container {

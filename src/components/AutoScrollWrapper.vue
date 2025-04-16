@@ -3,10 +3,11 @@ import { onMounted, ref, watch } from 'vue'
 
 const props = defineProps<{
   autoScroll?: boolean
+  throttlePixel?: number
 }>()
 
 const container = ref<HTMLElement | null>(null)
-const throttlePixel = 48
+const throttlePixel = props.throttlePixel ?? 148
 
 const scrollToBottom = (withThrottle = true) => {
   if (!container.value) return
