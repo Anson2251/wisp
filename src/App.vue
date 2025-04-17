@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import Chat from './components/Chat.vue'
+import { NDialogProvider } from 'naive-ui';
 </script>
 
 <template>
-  <Chat />
+  <n-dialog-provider>
+    <Chat />
+  </n-dialog-provider>
 </template>
 
 <style>

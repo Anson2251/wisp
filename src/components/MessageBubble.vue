@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { NAvatar, NIcon, NButton, NFlex, NButtonGroup } from 'naive-ui'
+import { NAvatar, NIcon, NButton, NFlex, NButtonGroup, useDialog } from 'naive-ui'
 import { Chat24Regular, Person24Regular, Copy16Regular, Delete16Regular } from '@vicons/fluent'
 import MarkdownRenderer from './MarkdownRenderer.vue'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { useChatStore } from '../stores/chat'
 
 const { deleteMessage } = useChatStore()
+const dialog = useDialog()
 
 const props = defineProps<{
   text: string
@@ -24,7 +25,15 @@ const copyMessage = async () => {
 }
 
 const removeMessage = () => {
-  deleteMessage(props.id)
+  dialog.warning({
+    title: 'Delete Message',
+    content: 'Are you sure you want to delete this message?',
+    positiveText: 'Delete',
+    negativeText: 'Cancel',
+    onPositiveClick: () => {
+      deleteMessage(props.id)
+    }
+  })
 }
 </script>
 
@@ -108,8 +117,8 @@ const removeMessage = () => {
 
 .footer {
   position: absolute;
-  bottom: -40px;
-  left: -4px;
+  bottom: -38px;
+  left: 2px;
   padding-top: 8px;
 
   display: flex;
