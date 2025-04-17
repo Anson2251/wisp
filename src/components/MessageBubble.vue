@@ -14,8 +14,13 @@ const props = defineProps<{
   id: string
 }>()
 
-const copyMessage = () => {
-  writeText(props.text)
+const copyMessage = async () => {
+  await writeText(props.text)
+  const bubble = document.querySelector(`.message-bubble[id="${props.id}"]`)
+  if (bubble) {
+    bubble.classList.add('copied')
+    setTimeout(() => bubble.classList.remove('copied'), 500)
+  }
 }
 
 const removeMessage = () => {
@@ -32,7 +37,7 @@ const removeMessage = () => {
     <n-avatar style="position: sticky; top: 0;">
       <n-icon :component="sender === 'bot' ? Chat24Regular : Person24Regular" />
     </n-avatar>
-    <div class="message-bubble" :class="sender">
+    <div class="message-bubble" :class="sender" :id="id">
       <div class="content">
         <MarkdownRenderer :text="text" />
       </div>
@@ -84,6 +89,17 @@ const removeMessage = () => {
   background: linear-gradient(135deg, #f5f5f5, #eeeeee);
   box-shadow: 0 2px 8px rgba(76, 76, 76, 0.2), 0 1px 4px rgba(38, 38, 38, 0.1);
   margin-right: auto;
+}
+
+.message-bubble.copied {
+  transform-origin: bottom;
+  animation: flash 0.5s ease;
+}
+
+@keyframes flash {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(0.98); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 .content {
