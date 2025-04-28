@@ -3,12 +3,9 @@ import { NInput, NButton } from 'naive-ui'
 import MessageBubble from './MessageBubble.vue'
 import AutoScrollWrapper from './AutoScrollWrapper.vue'
 import { useChatStore } from '../stores/chat'
-import { useMarkdown } from '../composables/useMarkdown'
 import { useOpenAI } from '../composables/useOpenAI'
 import { onMounted, ref } from 'vue'
-
-const { provideMarkdownProcessor } = useMarkdown()
-provideMarkdownProcessor()
+import debounce from 'lodash/debounce'
 
 const chatStore = useChatStore()
 const { streamResponse } = useOpenAI()
@@ -27,12 +24,23 @@ async function sendMessage() {
   chatStore.clearUserInput()
 
   const botMessage = {
-    text: '',
+    text: 'Generating ...',
     sender: 'bot' as const,
     timestamp: new Date()
   }
   await chatStore.addMessage(botMessage, false)
   const botMessageId = chatStore.messages[chatStore.messages.length - 1].id
+
+  const updateMessage = (text: string) => {
+    const message = chatStore.messages.find(m => m.id === botMessageId)
+    if (message) {
+      message.text = text
+    }
+  }
+
+  let responseText = ""
+
+  const updateBubbleText = debounce(updateMessage, 10)
 
   autoScrollWrapper.value?.scrollToBottom(false)
   await streamResponse(
@@ -41,10 +49,8 @@ async function sendMessage() {
       content: msg.text
     })),
     (chunk) => {
-      const message = chatStore.messages.find(m => m.id === botMessageId)
-      if (message) {
-        message.text += chunk
-      }
+      responseText += chunk
+      updateBubbleText(responseText)
       autoScrollWrapper.value?.scrollToBottom()
     },
     () => {
@@ -62,7 +68,7 @@ async function sendMessage() {
 
 onMounted(() => {
   chatStore.loadMessages().then(() => {
-    setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 100)
+    setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 500)
   })
 })
 </script>
@@ -70,17 +76,17 @@ onMounted(() => {
 <template>
   <div class="chat-container">
     <div class="messages-container">
-      <AutoScrollWrapper ref="autoScrollWrapper" :auto-scroll="true" :throttle-pixel="64">
+      <AutoScrollWrapper ref="autoScrollWrapper" :auto="true" :throttle="256" :smooth="true">
         <div class="bubble-container">
-        <MessageBubble v-for="message in chatStore.messages" :key="message.id" :text="message.text"
-          :sender="message.sender" :timestamp="message.timestamp" :id="message.id"/>
+          <MessageBubble v-for="message in chatStore.messages" :key="message.id" :text="message.text"
+            :sender="message.sender" :timestamp="message.timestamp" :id="message.id" />
         </div>
       </AutoScrollWrapper>
     </div>
 
     <div class="input-container">
       <n-input v-model:value="chatStore.userInput" placeholder="Type your message..." @keyup.enter="sendMessage"
-        clearable round/>
+        clearable round />
       <n-button type="primary" @click="sendMessage" round>Send</n-button>
     </div>
   </div>

@@ -2,12 +2,13 @@
 import { onMounted, ref, watch } from 'vue'
 
 const props = defineProps<{
-  autoScroll?: boolean
-  throttlePixel?: number
+  auto?: boolean
+  throttle?: number
+  smooth?: boolean
 }>()
 
 const container = ref<HTMLElement | null>(null)
-const throttlePixel = props.throttlePixel ?? 48
+const throttlePixel = props.throttle ?? 48
 
 const scrollToBottom = (withThrottle = true) => {
   if (!container.value) return
@@ -20,20 +21,20 @@ const scrollToBottom = (withThrottle = true) => {
 
   container.value.scrollTo({
     top: container.value.scrollHeight,
-    behavior: 'smooth'
+    behavior: props.smooth ? 'smooth' : 'auto'
   })
 }
 
 // Auto-scroll when slot content changes (if enabled)
 watch(() => container.value?.children, () => {
-  if (props.autoScroll !== false) {
+  if (props.auto !== false) {
     scrollToBottom()
   }
 }, { deep: true })
 
 // Initial scroll to bottom (if enabled)
 onMounted(() => {
-  if (props.autoScroll !== false) {
+  if (props.auto !== false) {
     scrollToBottom()
   }
 })

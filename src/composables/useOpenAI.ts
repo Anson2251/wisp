@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { ref } from 'vue'
+import { INTERFACE_PROMPT } from '../prompt-management/constants/interfacePrompt'
 
 export function useOpenAI() {
 	const isStreaming = ref(false)
@@ -16,7 +17,7 @@ export function useOpenAI() {
 		})
 
 		try {
-			await invoke('ask_openai_stream', { messages })
+			await invoke('ask_openai_stream', { messages: [{role: "system", content: INTERFACE_PROMPT}, ...messages] })
 		} finally {
 			unlisten()
 			isStreaming.value = false

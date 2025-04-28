@@ -29,4 +29,9 @@ export default defineConfig(async () => ({
 			ignored: ["**/src-tauri/**"],
 		},
 	},
+	resolve: {
+		alias: {
+			'micromark-extension-math': 'micromark-extension-llm-math'
+		}
+	}
 }));

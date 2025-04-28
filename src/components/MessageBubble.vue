@@ -48,22 +48,26 @@ const removeMessage = () => {
     </n-avatar>
     <div class="message-bubble" :class="sender" :id="id">
       <div class="content">
-        <MarkdownRenderer :text="text" />
+        <MarkdownRenderer :text="text" :mode="'vnode'"/>
       </div>
-      <div class="footer">
-        <n-button-group class="button-group">
-          <n-button quaternary :onclick="copyMessage" circle>
-            <template #icon>
-              <n-icon :component="Copy16Regular" />
-            </template>
-          </n-button>
-          <n-button quaternary :onclick="removeMessage" circle type="error">
-            <template #icon>
-              <n-icon :component="Delete16Regular" />
-            </template>
-          </n-button>
-        </n-button-group>
-        <span class="timestamp">{{ timestamp.toLocaleTimeString() }}</span>
+      <div class="footer" :style="{
+        justifyContent: sender === 'user' ? 'flex-end' : 'flex-start',
+      }">
+        <div class="footer-content">
+          <n-button-group class="button-group">
+            <n-button quaternary :onclick="copyMessage" circle>
+              <template #icon>
+                <n-icon :component="Copy16Regular" />
+              </template>
+            </n-button>
+            <n-button quaternary :onclick="removeMessage" circle type="error">
+              <template #icon>
+                <n-icon :component="Delete16Regular" />
+              </template>
+            </n-button>
+          </n-button-group>
+          <span class="timestamp">{{ timestamp.toLocaleTimeString() }}</span>
+        </div>
       </div>
     </div>
   </n-flex>
@@ -123,11 +127,19 @@ const removeMessage = () => {
 
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  overflow: visible;
   margin-top: 8px;
   width: 100%;
   opacity: var(--footer-buttons-opacity);
   transition: opacity .1s ease-in;
+}
+
+.footer-content {
+  width: 100%;
+  min-width: fit-content;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .timestamp {

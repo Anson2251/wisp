@@ -1,14 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { computedAsync } from '@vueuse/core'
-import { useMarkdown, useVueMdastRenderer } from '../composables/useMarkdown';
+import { useVueMdastRenderer, useStreamingMarkdownRenderer } from '../composables/useMarkdown';
 
-const {
-  useStreamingMarkdownRenderer,
-  injectMarkdownProcessor
-} = useMarkdown();
-
-type RenderMode = 'html' | 'stream' | 'vnode';
+type RenderMode = 'stream' | 'vnode';
 
 const props = defineProps<{
   text: string
@@ -18,16 +13,10 @@ const props = defineProps<{
 const mode = props.mode ?? 'html';
 const container = ref<HTMLDivElement | null>(null);
 
-// HTML mode (default)
-const { processMarkdown } = injectMarkdownProcessor();
-const html = computedAsync(async () => {
-  return await processMarkdown(props.text)
-});
-
 // VNode mode
 const VueMdastRenderer = useVueMdastRenderer();
-const content = computed(() => {
-  return VueMdastRenderer(props.text)
+const content = computedAsync(async () => {
+  return await VueMdastRenderer(props.text)
 });
 
 // Stream mode
@@ -43,9 +32,10 @@ if(mode === 'stream') {
 </script>
 
 <template>
-  <div v-if="mode === 'html'" class="markdown-content" v-html="html"></div>
-  <div v-else-if="mode === 'stream'" class="markdown-content" ref="container"></div>
-  <component v-else-if="mode === 'vnode'" :is="content"></component>
+  <div v-if="mode === 'stream'" class="markdown-content" ref="container"></div>
+  <div v-else-if="mode === 'vnode'" style="width: 100%; height: fit-content;" class="markdown-content">
+    <component :is="content"/>
+  </div>
 </template>
 
 <style>
@@ -59,10 +49,15 @@ if(mode === 'stream') {
 
 }
 
-.markdown-content > div {
-  animation: fade-in 0.5s ease-in-out;
+.markdown-content *:not(strong, em) {
+  animation: fade-in 0.8s ease-in-out;
+  transition: all 0.3s ease-in-out;
+}
+
+.markdown-content > * {
   width: 100%;
   height: fit-content;
+  box-sizing: border-box;
 }
 
 

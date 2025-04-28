@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 
-type Message = {
+export type Message = {
 	id: string
 	text: string
 	sender: 'user' | 'bot'
