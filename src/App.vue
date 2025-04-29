@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import Chat from './components/Chat.vue'
-import { NDialogProvider } from 'naive-ui';
+import { NDialogProvider, NConfigProvider } from 'naive-ui';
+import katex from 'katex'
+
 </script>
 
 <template>
   <n-dialog-provider>
-    <Chat />
+    <n-config-provider :katex="(katex as any)">
+      <Chat />
+    </n-config-provider>
   </n-dialog-provider>
 </template>
 

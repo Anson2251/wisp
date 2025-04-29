@@ -1,20 +1,21 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { computedAsync } from '@vueuse/core'
-import { useVueMdastRenderer, useStreamingMarkdownRenderer } from '../composables/useMarkdown';
+import { useVNodeRenderer, useStreamingMarkdownRenderer } from '../composables/useMarkdown';
 
 type RenderMode = 'stream' | 'vnode';
 
 const props = defineProps<{
   text: string
   mode?: RenderMode
+  mermaid?: boolean
 }>()
 
 const mode = props.mode ?? 'html';
 const container = ref<HTMLDivElement | null>(null);
 
 // VNode mode
-const VueMdastRenderer = useVueMdastRenderer();
+const VueMdastRenderer = useVNodeRenderer();
 const content = computedAsync(async () => {
   return await VueMdastRenderer(props.text)
 });
@@ -51,7 +52,7 @@ if(mode === 'stream') {
 
 .markdown-content *:not(strong, em) {
   animation: fade-in 0.8s ease-in-out;
-  transition: all 0.3s ease-in-out;
+  /* transition: all 0.3s ease-in-out; */
 }
 
 .markdown-content > * {
@@ -91,6 +92,15 @@ if(mode === 'stream') {
   margin-left: 0;
   color: #666;
 }
+
+/* if there is only one child (class name MathJax)*/
+/* .markdown-content p > .MathJax:only-child {
+  display: block;
+  width: 100%;
+  margin: 0 auto;
+  text-align: center;
+  font-size: 1.2em;
+} */
 
 .markdown-content ul,
 .markdown-content ol {

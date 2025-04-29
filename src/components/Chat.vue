@@ -37,12 +37,10 @@ async function sendMessage() {
       message.text = text
     }
   }
+  const updateBubbleText = debounce(updateMessage, 50)
+  autoScrollWrapper.value?.scrollToBottom(false)
 
   let responseText = ""
-
-  const updateBubbleText = debounce(updateMessage, 10)
-
-  autoScrollWrapper.value?.scrollToBottom(false)
   await streamResponse(
     chatStore.messages.map(msg => ({
       role: msg.sender === 'user' ? 'user' : 'assistant',
@@ -54,10 +52,14 @@ async function sendMessage() {
       autoScrollWrapper.value?.scrollToBottom()
     },
     () => {
+      const message = chatStore.messages.find(m => m.id === botMessageId)
+      if(!message) return
+      message.text = responseText
       chatStore.saveMessage({
-        ...(chatStore.messages.find(m => m.id === botMessageId)!),
+        ...message,
         timestamp: new Date()
       })
+
       // const message = chatStore.messages.find(m => m.id === botMessageId)
       // if (message) {
       //   message.text += "\n\n ` `" // TODO: to trigger the final render for the last block
@@ -68,7 +70,7 @@ async function sendMessage() {
 
 onMounted(() => {
   chatStore.loadMessages().then(() => {
-    setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 500)
+    setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 1000)
   })
 })
 </script>
@@ -86,7 +88,7 @@ onMounted(() => {
 
     <div class="input-container">
       <n-input v-model:value="chatStore.userInput" placeholder="Type your message..." @keyup.enter="sendMessage"
-        clearable round />
+        clearable round type="textarea"/>
       <n-button type="primary" @click="sendMessage" round>Send</n-button>
     </div>
   </div>

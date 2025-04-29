@@ -10,4 +10,7 @@ graph TD;
     B-->D;
     C-->D;
 \`\`\`
+
+The mermaid diagram above will be rendered as a live preview diagram by this interface.
+You do not have to repeat the content of the diagram. But if user indicates the error of diagram rendering, you can repeat the content using a code block of text
 `.trim();

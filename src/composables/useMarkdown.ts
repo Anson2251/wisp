@@ -11,6 +11,11 @@ import { rehypeVue } from 'rehype-vue'
 import rehypeMermaid from 'rehype-mermaid'
 import remarkGfm from 'remark-gfm'
 import rehypePrism from 'rehype-prism'
+import rehypeMathJaxSvg from 'rehype-mathjax/svg'
+import { h } from 'vue'
+import { NP, NEquation } from 'naive-ui'
+import { toVNode } from '../libs/to-vnode'
+import { InlineCode } from 'mdast'
 
 function createProcessor() {
 	return unified()
@@ -23,9 +28,10 @@ function createProcessor() {
 		})
 		.use(rehypeRaw)
 		.use(rehypeSanitize)
-		.use(rehypeKatex, {
-			output: "mathml"
-		})
+		// .use(rehypeKatex, {
+		// 	output: "mathml"
+		// })
+		.use(rehypeMathJaxSvg)
 		.use(rehypeMermaid)
 		.use(rehypePrism)
 		.use(rehypeStringify)
@@ -62,26 +68,54 @@ export function useStreamingMarkdownRenderer(onAppend: (html: string) => void) {
 	}
 }
 
-export function useVueMdastRenderer() {
-	const processor = unified()
-	.use(remarkParse)
-	.use(remarkGfm)
-	.use(remarkMath, {
-		singleDollarTextMath: true
+export function useVNodeRenderer() {
+	let processor = unified()
+		.use(remarkParse)
+		.use(remarkMath, {
+			singleDollarTextMath: true
+		})
+		.use(remarkGfm)
+
+
+	// if (mermaid) {
+	// 	processor = processor.use(rehypeMermaid, {
+	// 		strategy: mermaid ? 'inline-svg' : 'pre-mermaid'
+	// 	})
+	// }
+
+	const getInlineMathComponent = (node: InlineCode) => h(NEquation, {
+		katexOptions: {
+			displayMode: false,
+			output: 'mathml'
+		},
+		value: node.value,
+		style: "font-size: 1.15em; padding: 2px"
 	})
-	.use(remarkRehype, {
-		allowDangerousHtml: true,
+
+	const getMathComponent = (node: InlineCode) => h(NEquation, {
+		katexOptions: {
+			displayMode: true,
+			output: 'mathml'
+		},
+		value: node.value,
+		style: "font-size: 1.2em; padding: 4px"
 	})
-	.use(rehypeRaw)
-	.use(rehypeSanitize)
-	.use(rehypeKatex, {
-		output: "mathml"
-	})
-	.use(rehypeMermaid)
-	.use(rehypePrism)
-	.use(rehypeVue)
+
 
 	return async (text: string) => {
-		return (await processor.process(text)).result
+		try {
+			const tree = processor.parse(text)
+			const vnode = toVNode(tree, {
+				components: {
+					inlineMath: getInlineMathComponent,
+					math: getMathComponent
+				}
+			})
+			return vnode
+		}
+		catch (error) {
+			console.error(error)
+			return null
+		}
 	}
 }
