@@ -1,33 +1,13 @@
-use rusqlite::{params, Statement};
+use rusqlite::params;
 use super::DbPool;
-use thiserror::Error;
-use super::statement::leak_stmt;
+use super::types::ThreadError;
 
-#[derive(Debug, Error)]
-pub enum ThreadError {
-    #[error("Database error: {0}")]
-    Database(#[from] rusqlite::Error),
-    #[error("Connection pool error: {0}")]
-    Pool(#[from] r2d2::Error),
-    #[error("Invalid thread relation")]
-    InvalidRelation,
-	#[error("Invalid thread relation in batch operation at index {0}")]
-	InvalidRelationBatch(usize),
-}
 
 pub struct Threads {
     pool: DbPool,
-    add_stmt: Statement<'static>,
-    delete_stmt: Statement<'static>,
-    delete_with_parent_stmt: Statement<'static>,
-	delete_with_child_stmt: Statement<'static>,
-    get_children_stmt: Statement<'static>,
-    get_parent_stmt: Statement<'static>,
-    exists_stmt: Statement<'static>,
-	exists_node_stmt: Statement<'static>,
-	update_parent_stmt: Statement<'static>,
 }
 
+#[allow(unused)]
 impl Threads {
     pub const TABLE_NAME: &'static str = "threads";
 
@@ -46,70 +26,19 @@ impl Threads {
             [],
         )?;
 
-        unsafe {
-            let add_stmt = leak_stmt(conn.prepare(&format!(
-                "INSERT INTO {} (id, parent_id) VALUES (?1, ?2)",
-                Self::TABLE_NAME
-            ))?);
-
-            let delete_stmt = leak_stmt(conn.prepare(&format!(
-                "DELETE FROM {} WHERE id = ?1 AND parent_id = ?2",
-                Self::TABLE_NAME
-            ))?);
-
-            let delete_with_parent_stmt = leak_stmt(conn.prepare(&format!(
-                "DELETE FROM {} WHERE parent_id = ?1",
-                Self::TABLE_NAME
-            ))?);
-
-			let delete_with_child_stmt = leak_stmt(conn.prepare(&format!(
-                "DELETE FROM {} WHERE id = ?1",
-                Self::TABLE_NAME
-            ))?);
-
-            let get_children_stmt = leak_stmt(conn.prepare(&format!(
-                "SELECT id FROM {} WHERE parent_id = ?1",
-                Self::TABLE_NAME
-            ))?);
-
-            let get_parent_stmt = leak_stmt(conn.prepare(&format!(
-                "SELECT parent_id FROM {} WHERE id = ?1",
-                Self::TABLE_NAME
-            ))?);
-
-            let exists_stmt = leak_stmt(conn.prepare(&format!(
-                "SELECT EXISTS(SELECT 1 FROM {} WHERE id = ?1 AND parent_id = ?2)",
-                Self::TABLE_NAME
-            ))?);
-
-			let exists_node_stmt = leak_stmt(conn.prepare(&format!(
-                "SELECT EXISTS(SELECT 1 FROM {} WHERE id = ?1)",
-                Self::TABLE_NAME
-            ))?);
-
-			let update_parent_stmt = leak_stmt(conn.prepare(&format!(
-                "UPDATE {} SET parent_id = ?1 WHERE id = ?2",
-                Self::TABLE_NAME
-            ))?);
-
-            Ok(Self {
-                pool,
-                add_stmt,
-                delete_stmt,
-                delete_with_parent_stmt,
-				delete_with_child_stmt,
-                get_children_stmt,
-                get_parent_stmt,
-                exists_stmt,
-				exists_node_stmt,
-                update_parent_stmt,
-            })
-        }
+        Ok(Self { pool })
     }
 
 	/// Add a new thread relation.
     pub fn add(&mut self, message_id: &str, parent_id: &str) -> Result<(), ThreadError> {
-        self.add_stmt.execute(params![message_id, parent_id])?;
+        let conn = self.pool.get()?;
+        conn.execute(
+            &format!(
+                "INSERT INTO {} (id, parent_id) VALUES (?1, ?2)",
+                Self::TABLE_NAME
+            ),
+            params![message_id, parent_id],
+        )?;
         Ok(())
     }
 
@@ -133,7 +62,14 @@ impl Threads {
 
 	/// Update the parent of a thread relation.
 	pub fn update_parent(&mut self, message_id: &str, new_parent_id: &str) -> Result<(), ThreadError> {
-		self.update_parent_stmt.execute(params![new_parent_id, message_id])?;
+		let conn = self.pool.get()?;
+		conn.execute(
+			&format!(
+				"UPDATE {} SET parent_id = ?1 WHERE id = ?2",
+				Self::TABLE_NAME
+			),
+			params![new_parent_id, message_id],
+		)?;
 		Ok(())
 	}
 
@@ -142,7 +78,14 @@ impl Threads {
         if !self.exists(message_id, parent_id)? {
             return Err(ThreadError::InvalidRelation);
         }
-        self.delete_stmt.execute(params![message_id, parent_id])?;
+        let conn = self.pool.get()?;
+        conn.execute(
+            &format!(
+                "DELETE FROM {} WHERE id = ?1 AND parent_id = ?2",
+                Self::TABLE_NAME
+            ),
+            params![message_id, parent_id],
+        )?;
         Ok(())
     }
 
@@ -174,20 +117,40 @@ impl Threads {
 
 	/// Delete all thread relations with a specific parent.
     pub fn delete_with_parent(&mut self, parent_id: &str) -> Result<(), ThreadError> {
-        self.delete_with_parent_stmt.execute(params![parent_id])?;
+        let conn = self.pool.get()?;
+        conn.execute(
+            &format!(
+                "DELETE FROM {} WHERE parent_id = ?1",
+                Self::TABLE_NAME
+            ),
+            params![parent_id],
+        )?;
         Ok(())
     }
 
 	/// Delete all thread relation with a specific child.
 	pub fn delete_with_child(&mut self, message_id: &str) -> Result<(), ThreadError> {
-        self.delete_with_child_stmt.execute(params![message_id])?;
+        let conn = self.pool.get()?;
+        conn.execute(
+            &format!(
+                "DELETE FROM {} WHERE id = ?1",
+                Self::TABLE_NAME
+            ),
+            params![message_id],
+        )?;
         Ok(())
     }
 
 	/// Get all children of a specific parent.
     pub fn get_children(&mut self, parent_id: &str) -> Result<Vec<String>, ThreadError> {
+        let conn = self.pool.get()?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT id FROM {} WHERE parent_id = ?1",
+            Self::TABLE_NAME
+        ))?;
+
         let mut children = Vec::new();
-        for row in self.get_children_stmt.query_map(params![parent_id], |row| {
+        for row in stmt.query_map(params![parent_id], |row| {
             row.get::<_, String>(0)
         })? {
             children.push(row?);
@@ -197,7 +160,13 @@ impl Threads {
 
 	/// Get the parent of a specific message.
     pub fn get_parent(&mut self, message_id: &str) -> Result<Option<String>, ThreadError> {
-        let parent_id: Option<String> = self.get_parent_stmt.query_row(params![message_id], |row| {
+        let conn = self.pool.get()?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT parent_id FROM {} WHERE id = ?1",
+            Self::TABLE_NAME
+        ))?;
+
+        let parent_id: Option<String> = stmt.query_row(params![message_id], |row| {
             row.get::<_, Option<String>>(0)
         })?;
         Ok(parent_id)
@@ -205,17 +174,29 @@ impl Threads {
 
 	/// Check if a thread relation exists with a specific message and parent.
     pub fn exists(&mut self, message_id: &str, parent_id: &str) -> Result<bool, ThreadError> {
-        let exists = self.exists_stmt.query_row(params![message_id, parent_id], |row| {
-            row.get::<_, bool>(0)
-        })?;
+        let conn = self.pool.get()?;
+        let exists: bool = conn.query_row(
+            &format!(
+                "SELECT EXISTS(SELECT 1 FROM {} WHERE id = ?1 AND parent_id = ?2)",
+                Self::TABLE_NAME
+            ),
+            params![message_id, parent_id],
+            |row| row.get(0),
+        )?;
         Ok(exists)
     }
 
 	/// Check if a specific message exists in the thread.
     pub fn exists_node(&mut self, message_id: &str) -> Result<bool, ThreadError> {
-        let exists = self.exists_node_stmt.query_row(params![message_id], |row| {
-            row.get::<_, bool>(0)
-        })?;
+        let conn = self.pool.get()?;
+        let exists: bool = conn.query_row(
+            &format!(
+                "SELECT EXISTS(SELECT 1 FROM {} WHERE id = ?1)",
+                Self::TABLE_NAME
+            ),
+            params![message_id],
+            |row| row.get(0),
+        )?;
         Ok(exists)
     }
 

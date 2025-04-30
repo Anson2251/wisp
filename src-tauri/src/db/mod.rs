@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 pub mod threads;
 pub mod messages;
-pub mod statement;
 pub mod chat;
 pub mod conversations;
+pub mod types;
 
 pub type DbPool = Arc<Pool<SqliteConnectionManager>>;
 

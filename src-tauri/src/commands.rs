@@ -1,11 +1,17 @@
+use std::sync::Mutex;
+
 use crate::{
     cache::AstCache,
-    // db::{Database, Message},
+    db::types::{Conversation, Message},
     utils::compute_content_hash,
 };
 use serde_json::Value;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
+use crate::types::AppData;
+use crate::utils::get_uuid_v4;
+
+// Content utilities
 #[tauri::command]
 pub fn hash_content(content: String) -> String {
     compute_content_hash(&content)
@@ -13,41 +19,82 @@ pub fn hash_content(content: String) -> String {
 
 #[tauri::command]
 pub async fn put_cached_render(hash: String, ast_json: String, rendered_html: String) {
-    let cache = AstCache::new();
-    cache.put(&hash, &ast_json, &rendered_html);
+    AstCache::new().put(&hash, &ast_json, &rendered_html);
 }
 
+// OpenAI integration
 #[tauri::command]
 pub async fn ask_openai_stream(app_handle: AppHandle, messages: Vec<Value>) -> Result<(), String> {
     crate::api::ask_openai_stream(app_handle, messages).await
 }
 
+// Chat operations
 #[tauri::command]
-pub async fn save_message(
+pub async fn create_conversation(
     app_handle: AppHandle,
-    id: String,
+    name: String,
+    description: Option<String>
+) -> Result<String, String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+	let mut state = state.lock().unwrap();
+
+    let id = get_uuid_v4();
+    state.chat.create_conversation(
+        &id,
+        &name,
+        description.as_deref(),
+    ).map(|_| id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn add_message(
+    app_handle: AppHandle,
+    conversation_id: String,
     text: String,
     sender: String,
+    parent_id: Option<String>
+) -> Result<String, String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+	let mut state = state.lock().unwrap();
+
+    let message_id = get_uuid_v4();
+    state.chat.add_message(
+        &conversation_id,
+        &message_id,
+        &text,
+        &sender,
+        parent_id.as_deref()
+    ).map(|_| message_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_conversation_thread(
+    app_handle: AppHandle,
+    conversation_id: String
+) -> Result<Vec<Message>, String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+	let mut state = state.lock().unwrap();
+
+    state.chat.get_conversation_thread(&conversation_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_conversation(
+    app_handle: AppHandle,
+    conversation_id: String
 ) -> Result<(), String> {
-    let db = Database::new(&app_handle).map_err(|e| e.to_string())?;
-    db.save_message(&id, &text, &sender)
-        .map_err(|e| e.to_string())
+    let state = app_handle.state::<Mutex<AppData>>();
+	let mut state = state.lock().unwrap();
+
+    state.chat.delete_conversation(&conversation_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn get_messages(app_handle: AppHandle) -> Result<Vec<Message>, String> {
-    let db = Database::new(&app_handle).map_err(|e| e.to_string())?;
-    db.get_messages().map_err(|e| e.to_string())
-}
+pub async fn list_conversations(
+    app_handle: AppHandle
+) -> Result<Vec<Conversation>, String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+	let mut state = state.lock().unwrap();
 
-#[tauri::command]
-pub async fn clear_messages(app_handle: AppHandle) -> Result<(), String> {
-    let db = Database::new(&app_handle).map_err(|e| e.to_string())?;
-    db.clear_messages().map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn delete_message(app_handle: AppHandle, id: String) -> Result<(), String> {
-    let db = Database::new(&app_handle).map_err(|e| e.to_string())?;
-    db.delete_message(&id).map_err(|e| e.to_string())
+    state.chat.list_conversations().map_err(|e| e.to_string())
 }

@@ -1,34 +1,12 @@
-use rusqlite::{params, Statement};
-use thiserror::Error;
+use rusqlite::params;
 use super::DbPool;
-use super::statement::leak_stmt;
-
-#[derive(Debug, Error)]
-pub enum ConversationError {
-    #[error("Database error: {0}")]
-    Database(#[from] rusqlite::Error),
-    #[error("Connection pool error: {0}")]
-    Pool(#[from] r2d2::Error),
-}
-
-pub struct Conversation {
-    id: String,
-    name: String,
-    description: Option<String>,
-    entry_message_id: String,
-}
+use super::types::{Conversation, ConversationError};
 
 pub struct Conversations {
     pool: DbPool,
-	list_stmt: Statement<'static>,
-	create_stmt: Statement<'static>,
-	update_name_stmt: Statement<'static>,
-	update_description_stmt: Statement<'static>,
-	update_entry_message_id_stmt: Statement<'static>,
-	get_stmt: Statement<'static>,
-	delete_stmt: Statement<'static>,
 }
 
+#[allow(unused)]
 impl Conversations {
     pub const TABLE_NAME: &'static str = "conversations";
 
@@ -50,109 +28,110 @@ impl Conversations {
             [],
         )?;
 
-		unsafe {
-			let create_stmt = leak_stmt(conn.prepare(&format!(
-					"INSERT INTO {} (id, name, description, entry_message_id) VALUES (?1, ?2, ?3, ?4)",
-					Self::TABLE_NAME
-				))?
-			);
-
-			let update_name_stmt = leak_stmt(conn.prepare(&format!(
-					"UPDATE {} SET name = ?2 WHERE id = ?1",
-					Self::TABLE_NAME
-				))?
-			);
-
-			let update_description_stmt = leak_stmt(conn.prepare(&format!(
-					"UPDATE {} SET description = ?2 WHERE id = ?1",
-					Self::TABLE_NAME
-				))?
-			);
-
-			let update_entry_message_id_stmt = leak_stmt(conn.prepare(&format!(
-					"UPDATE {} SET entry_message_id = ?2 WHERE id = ?1",
-					Self::TABLE_NAME
-				))?
-			);
-
-			let get_stmt = leak_stmt(conn.prepare(&format!(
-					"SELECT * FROM {} WHERE id = ?1",
-					Self::TABLE_NAME
-				))?
-			);
-
-			let delete_stmt = leak_stmt(conn.prepare(&format!(
-					"DELETE FROM {} WHERE id = ?1",
-					Self::TABLE_NAME
-				))?
-			);
-
-			let list_stmt = leak_stmt(conn.prepare(&format!(
-					"SELECT * FROM {} ORDER BY name ASC LIMIT ?1 OFFSET ?2",
-					Self::TABLE_NAME
-				))?
-			);
-
-			Ok(Self {
-				pool,
-				list_stmt,
-				update_name_stmt,
-				update_description_stmt,
-				update_entry_message_id_stmt,
-				get_stmt,
-				delete_stmt,
-				create_stmt
-			})
-		}
+        Ok(Self { pool })
     }
 
-	pub fn create(&mut self, id: &str, name: &str, description: &str, entry_message_id: &str) -> Result<(), ConversationError> {
-		self.create_stmt
-			.execute(params![id, name, description, entry_message_id])?;
-
+	pub fn create(&mut self, id: &str, name: &str, description: Option<&str>, entry_message_id: Option<&str>) -> Result<(), ConversationError> {
+		let conn = self.pool.get()?;
+		conn.execute(
+			&format!(
+				"INSERT INTO {} (id, name, description, entry_message_id) VALUES (?1, ?2, ?3, ?4)",
+				Self::TABLE_NAME
+			),
+			params![id, name, description, entry_message_id],
+		)?;
 		Ok(())
 	}
 
+	pub fn exists(&mut self, id: &str) -> Result<bool, ConversationError> {
+		let conn = self.pool.get()?;
+		let mut stmt = conn.prepare(&format!(
+			"SELECT EXISTS(SELECT 1 FROM {} WHERE id = ?1)",
+			Self::TABLE_NAME
+		))?;
+		let exists = stmt.query_row(params![id], |row| row.get(0))?;
+		Ok(exists)
+	}
+
 	pub fn get(&mut self, id: &str) -> Result<Option<Conversation>, ConversationError> {
-		let row = self.get_stmt
-			.query_row(params![id], |row| {
-				Ok(Conversation {
-					id: row.get(0)?,
-					name: row.get(1)?,
-					description: row.get(2)?,
-					entry_message_id: row.get(3)?,
-				})
-			})?;
-		Ok(Some(row))
+		let conn = self.pool.get()?;
+		let mut stmt = conn.prepare(&format!(
+			"SELECT * FROM {} WHERE id = ?1",
+			Self::TABLE_NAME
+		))?;
+
+		let result = stmt.query_row(params![id], |row| {
+			Ok(Conversation {
+				id: row.get(0)?,
+				name: row.get(1)?,
+				description: row.get(2)?,
+				entry_message_id: row.get(3)?,
+			})
+		});
+
+		match result {
+			Ok(conv) => Ok(Some(conv)),
+			Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+			Err(e) => Err(e.into()),
+		}
 	}
 
 	pub fn update_name(&mut self, id: &str, name: &str) -> Result<(), ConversationError> {
-		self.update_name_stmt
-			.execute(params![id, name])?;
-
+		let conn = self.pool.get()?;
+		conn.execute(
+			&format!(
+				"UPDATE {} SET name = ?2 WHERE id = ?1",
+				Self::TABLE_NAME
+			),
+			params![id, name],
+		)?;
 		Ok(())
 	}
 
 	pub fn update_description(&mut self, id: &str, description: &str) -> Result<(), ConversationError> {
-		self.update_description_stmt
-			.execute(params![id, description])?;
+		let conn = self.pool.get()?;
+		conn.execute(
+			&format!(
+				"UPDATE {} SET description = ?2 WHERE id = ?1",
+				Self::TABLE_NAME
+			),
+			params![id, description],
+		)?;
 		Ok(())
 	}
 
 	pub fn update_entry_message_id(&mut self, id: &str, entry_message_id: &str) -> Result<(), ConversationError> {
-		self.update_entry_message_id_stmt
-			.execute(params![id, entry_message_id])?;
+		let conn = self.pool.get()?;
+		conn.execute(
+			&format!(
+				"UPDATE {} SET entry_message_id = ?2 WHERE id = ?1",
+				Self::TABLE_NAME
+			),
+			params![id, entry_message_id],
+		)?;
 		Ok(())
 	}
 
 	pub fn delete(&mut self, id: &str) -> Result<(), ConversationError> {
-		self.delete_stmt
-			.execute(params![id])?;
+		let conn = self.pool.get()?;
+		conn.execute(
+			&format!(
+				"DELETE FROM {} WHERE id = ?1",
+				Self::TABLE_NAME
+			),
+			params![id],
+		)?;
 		Ok(())
 	}
 
 	pub fn list(&mut self) -> Result<Vec<Conversation>, ConversationError> {
-		let conversations = self.list_stmt
+		let conn = self.pool.get()?;
+		let mut stmt = conn.prepare(&format!(
+			"SELECT * FROM {} ORDER BY name ASC",
+			Self::TABLE_NAME
+		))?;
+
+		let conversations = stmt
 			.query_map(params![], |row| {
 				Ok(Conversation {
 					id: row.get(0)?,
@@ -161,8 +140,7 @@ impl Conversations {
 					entry_message_id: row.get(3)?,
 				})
 			})?
-			.collect::<Result<Vec<_>, rusqlite::Error>>()
-			.map_err(ConversationError::from)?;
+			.collect::<Result<Vec<_>, rusqlite::Error>>()?;
 
 		Ok(conversations)
 	}

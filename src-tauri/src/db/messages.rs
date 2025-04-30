@@ -1,75 +1,14 @@
-use rusqlite::{params, Statement};
+use rusqlite::params;
 use super::DbPool;
-use serde::{Deserialize, Serialize};
+
 use std::time::{SystemTime, UNIX_EPOCH};
-use thiserror::Error;
-
-use super::statement::leak_stmt;
-
-#[derive(Debug, Error)]
-pub enum MessageError {
-    #[error("Database error: {0}")]
-    Database(#[from] rusqlite::Error),
-    #[error("Connection pool error: {0}")]
-    Pool(#[from] r2d2::Error),
-    #[error("Invalid message role: {0}")]
-    InvalidRole(String),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum MessageRole {
-    #[serde(rename = "user")]
-    User,
-    #[serde(rename = "bot")]
-    Assistant,
-    #[serde(rename = "system")]
-    System,
-}
-
-impl std::fmt::Display for MessageRole {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MessageRole::User => write!(f, "user"),
-            MessageRole::Assistant => write!(f, "bot"),
-            MessageRole::System => write!(f, "system"),
-        }
-    }
-}
-
-impl TryFrom<String> for MessageRole {
-    type Error = MessageError;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        match s.as_str() {
-            "user" => Ok(MessageRole::User),
-            "bot" => Ok(MessageRole::Assistant),
-            "system" => Ok(MessageRole::System),
-            s => Err(MessageError::InvalidRole(s.to_string())),
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Message {
-    pub id: String,
-    pub text: String,
-    pub sender: MessageRole,
-    pub timestamp: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tokens: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub embedding: Option<Vec<u8>>,
-}
+use super::types::{MessageError, MessageRole, Message};
 
 pub struct Messages {
     pool: DbPool,
-    insert_stmt: Statement<'static>,
-    get_stmt: Statement<'static>,
-    update_text_stmt: Statement<'static>,
-    update_sender_stmt: Statement<'static>,
-    delete_stmt: Statement<'static>,
 }
 
+#[allow(unused)]
 impl Messages {
     pub const TABLE_NAME: &'static str = "messages";
 
@@ -90,40 +29,7 @@ impl Messages {
             [],
         )?;
 
-        unsafe {
-            let insert_stmt = leak_stmt(conn.prepare(&format!(
-                "INSERT INTO {} (id, text, sender, timestamp) VALUES (?1, ?2, ?3, ?4)",
-                Self::TABLE_NAME
-            ))?);
-
-            let get_stmt = leak_stmt(conn.prepare(&format!(
-                "SELECT id, text, sender, timestamp FROM {} WHERE id = ?1",
-                Self::TABLE_NAME
-            ))?);
-
-            let update_text_stmt = leak_stmt(conn.prepare(&format!(
-                "UPDATE {} SET text = ?2 WHERE id = ?1",
-                Self::TABLE_NAME
-            ))?);
-
-            let update_sender_stmt = leak_stmt(conn.prepare(&format!(
-                "UPDATE {} SET sender = ?2 WHERE id = ?1",
-                Self::TABLE_NAME
-            ))?);
-
-            let delete_stmt = leak_stmt(
-                conn.prepare(&format!("DELETE FROM {} WHERE id = ?1", Self::TABLE_NAME))?,
-            );
-
-            Ok(Self {
-                pool,
-                insert_stmt,
-                get_stmt,
-                update_text_stmt,
-                update_sender_stmt,
-                delete_stmt,
-            })
-        }
+        Ok(Self { pool })
     }
 
     pub fn add(&mut self, id: &str, text: &str, sender: &str, tokens: Option<i32>, embedding: Option<Vec<u8>>) -> Result<(), MessageError> {
@@ -132,8 +38,14 @@ impl Messages {
             .unwrap()
             .as_secs() as i64;
 
-        self.insert_stmt
-            .execute(params![id, text, sender, timestamp, tokens, embedding])?;
+        let conn = self.pool.get()?;
+        conn.execute(
+            &format!(
+                "INSERT INTO {} (id, text, sender, timestamp, tokens, embedding) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                Self::TABLE_NAME
+            ),
+            params![id, text, sender, timestamp, tokens, embedding],
+        )?;
         Ok(())
     }
 
@@ -160,7 +72,13 @@ impl Messages {
     }
 
     pub fn get(&mut self, id: &str) -> Result<Message, MessageError> {
-        let row = self.get_stmt.query_row(params![id], |row| {
+        let conn = self.pool.get()?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT id, text, sender, timestamp, tokens, embedding FROM {} WHERE id = ?1",
+            Self::TABLE_NAME
+        ))?;
+
+        let row = stmt.query_row(params![id], |row| {
             let sender_str: String = row.get(2)?;
             let sender = MessageRole::try_from(sender_str)
                 .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?;
@@ -204,26 +122,53 @@ impl Messages {
     }
 
     pub fn update_text(&mut self, id: &str, text: &str) -> Result<(), MessageError> {
-        self.update_text_stmt.execute(params![id, text])?;
+        let conn = self.pool.get()?;
+        conn.execute(
+            &format!(
+                "UPDATE {} SET text = ?2 WHERE id = ?1",
+                Self::TABLE_NAME
+            ),
+            params![id, text],
+        )?;
         Ok(())
     }
 
     pub fn update_sender(&mut self, id: &str, sender: MessageRole) -> Result<(), MessageError> {
-        self.update_sender_stmt
-            .execute(params![id, sender.to_string()])?;
+        let conn = self.pool.get()?;
+        conn.execute(
+            &format!(
+                "UPDATE {} SET sender = ?2 WHERE id = ?1",
+                Self::TABLE_NAME
+            ),
+            params![id, sender.to_string()],
+        )?;
         Ok(())
     }
 
     pub fn delete(&mut self, id: &str) -> Result<(), MessageError> {
-        self.delete_stmt.execute(params![id])?;
+        let conn = self.pool.get()?;
+        conn.execute(
+            &format!(
+                "DELETE FROM {} WHERE id = ?1",
+                Self::TABLE_NAME
+            ),
+            params![id],
+        )?;
         Ok(())
     }
 
     pub fn delete_batch(&mut self, ids: &[&str]) -> Result<(), MessageError> {
         let mut conn = self.pool.get()?;
         let tx = conn.transaction()?;
-        for id in ids {
-            self.delete_stmt.execute(params![id])?;
+        {
+            let mut stmt = tx.prepare(&format!(
+                "DELETE FROM {} WHERE id = ?1",
+                Self::TABLE_NAME
+            ))?;
+
+            for id in ids {
+                stmt.execute(params![id])?;
+            }
         }
         tx.commit()?;
         Ok(())

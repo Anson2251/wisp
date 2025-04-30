@@ -19,10 +19,14 @@ type MessageStored = {
 export const useChatStore = defineStore('chat', () => {
 	const messages = ref<Message[]>([])
 	const userInput = ref('')
+	const currentConversationId = ref<string>('default')
+	const conversations = ref<{id: string, name: string}[]>([])
 
 	const loadMessages = async () => {
 		try {
-			const loaded = await invoke<MessageStored[]>('get_messages')
+			const loaded = await invoke<MessageStored[]>('get_messages', {
+				conversationId: currentConversationId.value
+			})
 			messages.value = loaded.map(msg => ({
 				...msg,
 				timestamp: new Date(msg.timestamp * 1000),
@@ -33,12 +37,25 @@ export const useChatStore = defineStore('chat', () => {
 		}
 	}
 
+	const createConversation = async (name: string) => {
+		try {
+			const id = await invoke<string>('create_conversation', { name })
+			currentConversationId.value = id
+			messages.value = []
+			return id
+		} catch (error) {
+			console.error('[ChatStore] Failed to create conversation:', error)
+			throw error
+		}
+	}
+
 	const saveMessage = async (message: Message) => {
 		try {
-			await invoke('save_message', {
-				id: message.id,
+			await invoke('add_message', {
+				conversationId: currentConversationId.value,
 				text: message.text,
 				sender: message.sender,
+				parentId: null,
 				timestamp: Math.floor(message.timestamp.getTime() / 1000)
 			})
 		} catch (error) {
