@@ -28,3 +28,4 @@ tokio = { version = "1", features = ["full"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
 sha2 = "0.10"
 tauri-plugin-clipboard-manager = "2"
+thiserror = "2.0.12"

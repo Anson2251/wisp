@@ -5,10 +5,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Serialize, Deserialize)]
+pub enum MessageRole {
+	User,
+	Assistant,
+	System,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
     pub id: String,
     pub text: String,
-    pub sender: String,
+    pub sender: MessageRole,
     pub timestamp: i64,
 }
 
@@ -16,7 +23,11 @@ pub struct Database {
     conn: Connection,
 }
 
+
+
 impl Database {
+	pub const TABLE_NAME: &str = "messages";
+
     pub fn new(app_handle: &AppHandle) -> Result<Self, rusqlite::Error> {
         let app_dir = app_handle
             .path()
@@ -28,26 +39,26 @@ impl Database {
 
         let conn = Connection::open(db_path)?;
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS messages (
+            &format!("CREATE TABLE IF NOT EXISTS {} (
                 id TEXT PRIMARY KEY,
                 text TEXT NOT NULL,
-                sender TEXT NOT NULL CHECK (sender IN ('user', 'bot')),
+                sender TEXT NOT NULL,
                 timestamp INTEGER NOT NULL
-            )",
+            )", Self::TABLE_NAME),
             [],
         )?;
 
         Ok(Database { conn })
     }
 
-    pub fn save_message(&self, id: &str, text: &str, sender: &str) -> Result<(), rusqlite::Error> {
+    pub fn save_message(&self, id: &str, text: &str, sender: &str, parent_id: Option<&str>) -> Result<(), rusqlite::Error> {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs() as i64;
 
         self.conn.execute(
-            "INSERT INTO messages (id, text, sender, timestamp) VALUES (?1, ?2, ?3, ?4)",
+            &format!("INSERT INTO {} (id, text, sender, timestamp) VALUES (?1, ?2, ?3, ?4)", Self::TABLE_NAME),
             params![id, text, sender, timestamp],
         )?;
         Ok(())
@@ -56,14 +67,19 @@ impl Database {
     pub fn get_messages(&self) -> Result<Vec<Message>, rusqlite::Error> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, text, sender, timestamp FROM messages ORDER BY timestamp ASC")?;
+            .prepare(&format!("SELECT id, text, sender, timestamp FROM {} ORDER BY timestamp ASC", Self::TABLE_NAME))?;
 
         let messages = stmt
             .query_map([], |row| {
                 Ok(Message {
                     id: row.get(0)?,
                     text: row.get(1)?,
-                    sender: row.get(2)?,
+                    sender: match row.get::<_, Option<String>>(2)? {
+						Some(s) if s == "user" => MessageRole::User,
+						Some(s) if s == "bot" => MessageRole::Assistant,
+						Some(s) if s == "system" => MessageRole::System,
+						_ => return Err(rusqlite::Error::ToSqlConversionFailure("Unknown message role".into())),
+					},
                     timestamp: row.get(3)?,
                 })
             })?
