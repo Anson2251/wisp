@@ -1,4 +1,5 @@
-use rusqlite::{params, Connection, Statement};
+use rusqlite::{params, Statement};
+use super::DbPool;
 use thiserror::Error;
 use super::statement::leak_stmt;
 
@@ -6,6 +7,8 @@ use super::statement::leak_stmt;
 pub enum ThreadError {
     #[error("Database error: {0}")]
     Database(#[from] rusqlite::Error),
+    #[error("Connection pool error: {0}")]
+    Pool(#[from] r2d2::Error),
     #[error("Invalid thread relation")]
     InvalidRelation,
 	#[error("Invalid thread relation in batch operation at index {0}")]
@@ -13,7 +16,7 @@ pub enum ThreadError {
 }
 
 pub struct Threads {
-    conn: Connection,
+    pool: DbPool,
     add_stmt: Statement<'static>,
     delete_stmt: Statement<'static>,
     delete_with_parent_stmt: Statement<'static>,
@@ -29,9 +32,9 @@ impl Threads {
     pub const TABLE_NAME: &'static str = "threads";
 
 	/// Create a new `Threads` instance.
-    pub fn new(db_path: &str, message_table_name: &str, message_primary_key: &str) -> Result<Self, ThreadError> {
-        let conn = Connection::open(db_path)?;
-		conn.execute(
+    pub fn new(pool: DbPool, message_table_name: &str, message_primary_key: &str) -> Result<Self, ThreadError> {
+        let conn = pool.get().map_err(ThreadError::Pool)?;
+        conn.execute(
             &format!("CREATE TABLE IF NOT EXISTS {} (
                 id TEXT NOT NULL,
                 parent_id TEXT NOT NULL,
@@ -90,7 +93,7 @@ impl Threads {
             ))?);
 
             Ok(Self {
-                conn,
+                pool,
                 add_stmt,
                 delete_stmt,
                 delete_with_parent_stmt,
@@ -112,7 +115,8 @@ impl Threads {
 
 	/// Add multiple thread relations in a batch.
     pub fn add_batch(&mut self, relations: &[(&str, &str)]) -> Result<(), ThreadError> {
-        let tx = self.conn.transaction()?;
+        let mut conn = self.pool.get().map_err(ThreadError::Pool)?;
+        let tx = conn.transaction()?;
         {
             let mut stmt = tx.prepare(&format!(
                 "INSERT INTO {} (id, parent_id) VALUES (?1, ?2)",
@@ -152,7 +156,8 @@ impl Threads {
         }
 
         // Now perform the deletions in a transaction
-        let tx = self.conn.transaction()?;
+        let mut conn = self.pool.get().map_err(ThreadError::Pool)?;
+        let tx = conn.transaction()?;
         {
             let mut stmt = tx.prepare(&format!(
                 "DELETE FROM {} WHERE id = ?1 AND parent_id = ?2",

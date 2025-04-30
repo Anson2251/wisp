@@ -1,4 +1,5 @@
-use rusqlite::{params, Connection, Statement};
+use rusqlite::{params, Statement};
+use super::DbPool;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
@@ -9,6 +10,8 @@ use super::statement::leak_stmt;
 pub enum MessageError {
     #[error("Database error: {0}")]
     Database(#[from] rusqlite::Error),
+    #[error("Connection pool error: {0}")]
+    Pool(#[from] r2d2::Error),
     #[error("Invalid message role: {0}")]
     InvalidRole(String),
 }
@@ -59,7 +62,7 @@ pub struct Message {
 }
 
 pub struct Messages {
-    conn: Connection,
+    pool: DbPool,
     insert_stmt: Statement<'static>,
     get_stmt: Statement<'static>,
     update_text_stmt: Statement<'static>,
@@ -70,8 +73,8 @@ pub struct Messages {
 impl Messages {
     pub const TABLE_NAME: &'static str = "messages";
 
-    pub fn new(db_path: &str) -> Result<Self, MessageError> {
-		let conn = Connection::open(db_path)?;
+    pub fn new(pool: DbPool) -> Result<Self, MessageError> {
+        let conn = pool.get()?;
         conn.execute(
             &format!(
                 "CREATE TABLE IF NOT EXISTS {} (
@@ -113,7 +116,7 @@ impl Messages {
             );
 
             Ok(Self {
-                conn,
+                pool,
                 insert_stmt,
                 get_stmt,
                 update_text_stmt,
@@ -140,7 +143,8 @@ impl Messages {
             .unwrap()
             .as_secs() as i64;
 
-        let tx = self.conn.transaction()?;
+        let mut conn = self.pool.get()?;
+        let tx = conn.transaction()?;
         {
             let mut stmt = tx.prepare(&format!(
                 "INSERT INTO {} (id, text, sender, timestamp, tokens, embedding) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -173,7 +177,8 @@ impl Messages {
     }
 
     pub fn list(&mut self, limit: i64, offset: i64) -> Result<Vec<Message>, MessageError> {
-        let mut stmt = self.conn.prepare(&format!(
+        let conn = self.pool.get()?;
+        let mut stmt = conn.prepare(&format!(
             "SELECT id, text, sender, timestamp, tokens, embedding FROM {} ORDER BY timestamp DESC LIMIT ?1 OFFSET ?2",
             Self::TABLE_NAME
         ))?;
@@ -215,7 +220,8 @@ impl Messages {
     }
 
     pub fn delete_batch(&mut self, ids: &[&str]) -> Result<(), MessageError> {
-        let tx = self.conn.transaction()?;
+        let mut conn = self.pool.get()?;
+        let tx = conn.transaction()?;
         for id in ids {
             self.delete_stmt.execute(params![id])?;
         }

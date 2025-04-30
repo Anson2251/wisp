@@ -1,15 +1,18 @@
 use tauri::{AppHandle, Manager};
 use std::path::PathBuf;
+use thiserror::Error;
 
 use super::messages::{Messages, MessageError};
 use super::threads::{Threads, ThreadError};
 use super::conversations::{Conversations, ConversationError};
-use thiserror::Error;
+use super::create_pool;
 
 #[derive(Debug, Error)]
 pub enum ChatError {
     #[error("Database error: {0}")]
     Database(#[from] rusqlite::Error),
+    #[error("Connection pool error: {0}")]
+    Pool(#[from] r2d2::Error),
     #[error("Invalid chat relation")]
     Message(#[from] MessageError),
     #[error("Invalid thread relation")]
@@ -36,9 +39,10 @@ impl Chat {
 		let db_path = PathBuf::from(app_dir).join("messages.db");
         let db_path = db_path.to_str().expect("Failed to reach database path");
 
-		let messages_manager = Messages::new(&db_path)?;
-		let thread_manager = Threads::new(&db_path, "messages", "id")?;
-        let conversation_manager = Conversations::new(&db_path, "messages")?;
+        let pool = create_pool(db_path);
+		let messages_manager = Messages::new(pool.clone())?;
+		let thread_manager = Threads::new(pool.clone(), "messages", "id")?;
+        let conversation_manager = Conversations::new(pool, "messages")?;
 
         Ok(Chat {
 			app_handle: app_handle.clone(),

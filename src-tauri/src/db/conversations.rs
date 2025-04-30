@@ -1,12 +1,14 @@
-use rusqlite::{params, Connection, Statement};
+use rusqlite::{params, Statement};
 use thiserror::Error;
-
+use super::DbPool;
 use super::statement::leak_stmt;
 
 #[derive(Debug, Error)]
 pub enum ConversationError {
     #[error("Database error: {0}")]
     Database(#[from] rusqlite::Error),
+    #[error("Connection pool error: {0}")]
+    Pool(#[from] r2d2::Error),
 }
 
 pub struct Conversation {
@@ -17,7 +19,7 @@ pub struct Conversation {
 }
 
 pub struct Conversations {
-    conn: Connection,
+    pool: DbPool,
 	list_stmt: Statement<'static>,
 	create_stmt: Statement<'static>,
 	update_name_stmt: Statement<'static>,
@@ -30,10 +32,10 @@ pub struct Conversations {
 impl Conversations {
     pub const TABLE_NAME: &'static str = "conversations";
 
-    pub fn new(db_path: &str, message_table_name: &str) -> Result<Self, ConversationError> {
-        let conn = Connection::open(db_path)?;
+    pub fn new(pool: DbPool, message_table_name: &str) -> Result<Self, ConversationError> {
+        let conn = pool.get().map_err(ConversationError::Pool)?;
 
-		conn.execute(
+        conn.execute(
             &format!(
                 "CREATE TABLE IF NOT EXISTS {} (
 				id TEXT PRIMARY KEY,
@@ -92,7 +94,7 @@ impl Conversations {
 			);
 
 			Ok(Self {
-				conn,
+				pool,
 				list_stmt,
 				update_name_stmt,
 				update_description_stmt,
@@ -100,7 +102,7 @@ impl Conversations {
 				get_stmt,
 				delete_stmt,
 				create_stmt
-			 })
+			})
 		}
     }
 
@@ -164,9 +166,5 @@ impl Conversations {
 
 		Ok(conversations)
 	}
-
-    pub fn conn(&mut self) -> &mut Connection {
-        &mut self.conn
-    }
 
 }
