@@ -1,47 +1,41 @@
-use tauri::{AppHandle, Manager};
-use std::path::PathBuf;
-use super::types::{
-	Message,
-	Conversation,
-	ConversationError,
-	ChatError,
-};
+use super::conversations::Conversations;
 use super::messages::Messages;
 use super::threads::Threads;
-use super::conversations::Conversations;
+use super::types::{ChatError, Conversation, ConversationError, Message};
 use super::{create_pool, DbPool};
-
+use std::path::PathBuf;
+use tauri::{AppHandle, Manager};
 
 pub struct Chat {
-	pool: DbPool,
-	thread_manager: Threads,
-	conversation_manager: Conversations,
-	messages_manager: Messages,
+    pool: DbPool,
+    pub thread_manager: Threads,
+    pub conversation_manager: Conversations,
+    pub messages_manager: Messages,
 }
 
 #[allow(unused)]
 impl Chat {
     pub fn new(app_handle: &AppHandle) -> Result<Self, ChatError> {
-		let app_dir = app_handle
+        let app_dir = app_handle
             .path()
             .app_data_dir()
             .expect("Failed to get app data dir");
         println!("App dir: {:?}", app_dir);
         std::fs::create_dir_all(&app_dir).expect("Failed to create app data dir");
-		let db_path = PathBuf::from(app_dir).join("messages.db");
+        let db_path = PathBuf::from(app_dir).join("messages.db");
         let db_path = db_path.to_str().expect("Failed to reach database path");
 
         let pool = create_pool(db_path);
-		let messages_manager = Messages::new(pool.clone())?;
-		let thread_manager = Threads::new(pool.clone(), "messages", "id")?;
+        let messages_manager = Messages::new(pool.clone())?;
+        let thread_manager = Threads::new(pool.clone(), "messages", "id")?;
         let conversation_manager = Conversations::new(pool.clone(), "messages")?;
 
         Ok(Chat {
-			pool,
-			thread_manager,
-			conversation_manager,
-			messages_manager,
-		})
+            pool,
+            thread_manager,
+            conversation_manager,
+            messages_manager,
+        })
     }
 
     /// Creates a new conversation with initial system message
@@ -49,7 +43,7 @@ impl Chat {
         &mut self,
         conversation_id: &str,
         name: &str,
-        description: Option<&str>,
+        description: &str,
     ) -> Result<(), ChatError> {
         let mut conn = self.pool.get()?;
         let tx = conn.transaction()?;
@@ -57,8 +51,8 @@ impl Chat {
         self.conversation_manager.create(
             conversation_id,
             name,
-            description,
-            None, // Using same ID for initial message
+            Some(description),
+            None,
         )?;
 
         tx.commit()?;
@@ -72,36 +66,28 @@ impl Chat {
         message_id: &str,
         text: &str,
         sender: &str,
-        parent_message_id: Option<&str>
+        parent_message_id: Option<&str>,
     ) -> Result<(), ChatError> {
         let mut conn = self.pool.get()?;
         let tx = conn.transaction()?;
 
         // Add the message
-        self.messages_manager.add(
-            message_id,
-            text,
-            sender,
-            None,
-            None
-        )?;
+        self.messages_manager
+            .add(message_id, text, sender, None, None)?;
 
-        // Link to parent message if provided
-        if let Some(parent_id) = parent_message_id {
-            self.thread_manager.add(message_id, parent_id)?;
-        }
+        // Link to parent message
+        self.thread_manager.add(message_id, parent_message_id)?;
 
         // Link to conversation's entry message if no parent specified
         if parent_message_id.is_none() {
-            let conv = self.conversation_manager.get(conversation_id)?
-                .ok_or(ChatError::Conversation(ConversationError::Database(
-                    rusqlite::Error::QueryReturnedNoRows
-                )))?;
-            let entry_id = conv.entry_message_id.as_deref()
-                .ok_or(ChatError::Conversation(ConversationError::Database(
-                    rusqlite::Error::InvalidQuery
-                )))?;
-            self.thread_manager.add(message_id, entry_id)?;
+            let conv =
+                self.conversation_manager
+                    .get(conversation_id)?
+                    .ok_or(ChatError::Conversation(ConversationError::Database(
+                        rusqlite::Error::QueryReturnedNoRows,
+                    )))?;
+            let conv_id: &str = &conv.id;
+            self.conversation_manager.update_entry_message_id(conv_id, message_id)?;
         }
 
         tx.commit()?;
@@ -111,15 +97,22 @@ impl Chat {
     /// Gets full message thread for a conversation
     pub fn get_conversation_thread(
         &mut self,
-        conversation_id: &str
+        conversation_id: &str,
     ) -> Result<Vec<Message>, ChatError> {
-        let conv = self.conversation_manager.get(conversation_id)?
+        let conv =
+            self.conversation_manager
+                .get(conversation_id)?
+                .ok_or(ChatError::Conversation(ConversationError::Database(
+                    rusqlite::Error::QueryReturnedNoRows,
+                )))?;
+
+		if conv.entry_message_id.is_none() { return Ok(vec![]) }
+
+        let entry_id = conv
+            .entry_message_id
+            .as_deref()
             .ok_or(ChatError::Conversation(ConversationError::Database(
-                rusqlite::Error::QueryReturnedNoRows
-            )))?;
-        let entry_id = conv.entry_message_id.as_deref()
-            .ok_or(ChatError::Conversation(ConversationError::Database(
-                rusqlite::Error::InvalidQuery
+                rusqlite::Error::InvalidQuery,
             )))?;
 
         // Start with the entry message
@@ -165,33 +158,53 @@ impl Chat {
     /// Lists all conversations with their names
     pub fn list_conversations(&mut self) -> Result<Vec<Conversation>, ChatError> {
         let convs = self.conversation_manager.list()?;
-		Ok(convs)
+        Ok(convs)
     }
 
     /// Updates a message's content
-    pub fn update_message(
-        &mut self,
-        message_id: &str,
-        new_text: &str
-    ) -> Result<(), ChatError> {
+    pub fn update_message(&mut self, message_id: &str, new_text: &str) -> Result<(), ChatError> {
         self.messages_manager.update_text(message_id, new_text)?;
-		Ok(())
+        Ok(())
     }
 
     /// Deletes a message and its thread relationships
-    pub fn delete_message(
-        &mut self,
-        message_id: &str
-    ) -> Result<(), ChatError> {
+    pub fn delete_message(&mut self, message_id: &str, recursive: bool) -> Result<(), ChatError> {
         let mut conn = self.pool.get()?;
         let tx = conn.transaction()?;
 
-        // Delete all thread relationships
-        self.thread_manager.delete_with_child(message_id)?;
-        self.thread_manager.delete_with_parent(message_id)?;
+        if recursive {
+            // Delete all children of the message recursively
+            let mut all_children = Vec::new();
+            let mut current_children = self.thread_manager.get_children(message_id)?;
+            while !current_children.is_empty() {
+                let mut next_children = Vec::new();
+                for child in &current_children {
+                    next_children.extend(self.thread_manager.get_children(&child)?);
+                }
+                all_children.extend(current_children);
+                current_children = next_children;
+            }
 
-		// Delete message
-		self.messages_manager.delete(message_id)?;
+            // Delete all children
+            for child_id in all_children {
+                self.messages_manager.delete(&child_id)?;
+            }
+
+            // Delete the original message
+            self.messages_manager.delete(message_id)?;
+        } else {
+            let parent = self.thread_manager.get_parent(message_id)?;
+            let parent = parent.as_ref().map(|s| s.as_str());
+            let children = self.thread_manager.get_children(message_id)?;
+
+            // Update parent of children to the parent of the deleted message, or None if no parent exists
+            for child in children {
+                self.thread_manager.update_parent(&child, parent);
+            }
+
+            // Delete message
+            self.messages_manager.delete(message_id)?;
+        }
 
         tx.commit()?;
         Ok(())

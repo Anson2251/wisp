@@ -1,95 +1,104 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-
-export type Message = {
-	id: string
-	text: string
-	sender: 'user' | 'bot'
-	timestamp: Date
-}
-
-type MessageStored = {
-	id: string
-	text: string
-	sender: string
-	timestamp: number
-}
+import type { Message, Conversation } from '../libs/types'
+import * as Commands from '../libs/commands'
 
 export const useChatStore = defineStore('chat', () => {
 	const messages = ref<Message[]>([])
 	const userInput = ref('')
-	const currentConversationId = ref<string>('default')
-	const conversations = ref<{id: string, name: string}[]>([])
+	const currentConversationId = ref<string | null>(null)
+	const lastMessageId = ref<string | null>(null)
+	const conversations = ref<{ id: string, name: string }[]>([])
 
-	const loadMessages = async () => {
-		try {
-			const loaded = await invoke<MessageStored[]>('get_messages', {
-				conversationId: currentConversationId.value
+	const loadMessages = async (conversationId: string) => {
+		return new Promise<void>((resolve, reject) => {
+			Commands.getConversationThread(conversationId).then((storedMessages) => {
+				if (storedMessages.length > 0) {
+					messages.value = storedMessages;
+					lastMessageId.value = storedMessages[storedMessages.length - 1]?.id || null;
+				}
+				resolve()
+			}).catch((err) => {
+				console.error('[ChatStore] Failed to load messages:', err)
+				reject(err)
 			})
-			messages.value = loaded.map(msg => ({
-				...msg,
-				timestamp: new Date(msg.timestamp * 1000),
-				sender: msg.sender as 'user' | 'bot'
-			}))
-		} catch (error) {
-			console.error('[ChatStore] Failed to load messages:', error)
-		}
+		})
 	}
 
-	const createConversation = async (name: string) => {
-		try {
-			const id = await invoke<string>('create_conversation', { name })
-			currentConversationId.value = id
-			messages.value = []
-			return id
-		} catch (error) {
-			console.error('[ChatStore] Failed to create conversation:', error)
-			throw error
-		}
+	const createConversation = (name: string, description: string) => {
+		return new Promise<string>((resolve, reject) => {
+			Commands.createConversation(name, description)
+				.then((id) => {
+					conversations.value.push({ id, name })
+					resolve(id)
+				})
+				.catch((err) => {
+					console.error('[ChatStore] Failed to create conversation:', err)
+					reject(err)
+				})
+		})
 	}
 
-	const saveMessage = async (message: Message) => {
-		try {
-			await invoke('add_message', {
-				conversationId: currentConversationId.value,
-				text: message.text,
-				sender: message.sender,
-				parentId: null,
-				timestamp: Math.floor(message.timestamp.getTime() / 1000)
-			})
-		} catch (error) {
-			console.error('[ChatStore] Failed to save message:', error)
-		}
+	const addMessage = (message: Omit<Message, 'id'>, parentId?: string) => {
+		return new Promise<string>((resolve, reject) => {
+			const conversationId = currentConversationId.value
+			if (!conversationId) {
+				console.error('[ChatStore] No conversation selected')
+				return
+			}
+			Commands.addMessage(conversationId, message.text, message.sender, parentId ?? (lastMessageId.value ?? undefined))
+				.then(async (id) => {
+					messages.value.push({ ...message, id })
+					lastMessageId.value = id
+
+					resolve(id)
+				})
+				.catch((err) => {
+					console.error('[ChatStore] Failed to add message:', err)
+					reject(err)
+				})
+		})
 	}
 
-	const addMessage = async (message: Omit<Message, 'id'>, store = true) => {
-		try {
-			const id = crypto.randomUUID().toLocaleUpperCase()
-			const messageWithId = { ...message, id }
-			if (store) await saveMessage(messageWithId)
-			messages.value.push(messageWithId)
-		} catch (error) {
-			console.error('[ChatStore] Failed to add message:', error)
-		}
+	const listConversations = () => {
+		return new Promise<Conversation[]>((resolve, reject) => {
+			Commands.listConversations()
+				.then((conversations) => {
+					resolve(conversations)
+				})
+				.catch((err) => {
+					console.error('[ChatStore] Failed to list conversations:', err)
+					reject(err)
+				})
+		})
 	}
 
-	const clearMessages = async () => {
-		try {
-			await invoke('clear_messages')
-			messages.value = []
-		} catch (error) {
-			console.error('[ChatStore] Failed to clear messages:', error)
-		}
+	const updateMessage = (id: string, text: string) => {
+		return new Promise<void>((resolve, reject) => {
+			Commands.updateMessage(id, text)
+				.then(() => {
+					messages.value = messages.value.map(msg => msg.id === id ? { ...msg, text } : msg)
+					resolve()
+				})
+				.catch((err) => {
+					console.error('[ChatStore] Failed to update message:', err)
+					reject(err)
+				})
+		})
 	}
 
-	const deleteMessage = async (id: string) => {
-		try {
-			await invoke('delete_message', { id })
-			messages.value = messages.value.filter(msg => msg.id !== id)
-		} catch (error) {
-			console.error('[ChatStore] Failed to delete message:', error)
-		}
+	const deleteMessage = (id: string) => {
+		return new Promise<void>((resolve, reject) => {
+			Commands.deleteMessage(id, false)
+				.then(() => {
+					messages.value = messages.value.filter(msg => msg.id !== id)
+					resolve()
+				})
+				.catch((err) => {
+					console.error('[ChatStore] Failed to delete message:', err)
+					reject(err)
+				})
+		})
 	}
 
 	const clearUserInput = () => {
@@ -101,9 +110,12 @@ export const useChatStore = defineStore('chat', () => {
 		userInput,
 		loadMessages,
 		addMessage,
-		saveMessage,
-		clearMessages,
+		createConversation,
+		listConversations,
+		updateMessage,
 		deleteMessage,
+		currentConversationId,
+		// deleteMessage,
 		clearUserInput
 	}
 })

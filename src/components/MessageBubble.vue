@@ -3,6 +3,7 @@ import { NAvatar, NIcon, NButton, NFlex, NButtonGroup, useDialog } from 'naive-u
 import { Chat24Regular, Person24Regular, Copy16Regular, Delete16Regular } from '@vicons/fluent'
 import MarkdownRenderer from './MarkdownRenderer.vue'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { MessageRole } from '../libs/types'
 import { useChatStore } from '../stores/chat'
 
 const { deleteMessage } = useChatStore()
@@ -10,7 +11,7 @@ const dialog = useDialog()
 
 const props = defineProps<{
   text: string
-  sender: 'user' | 'bot'
+  sender: MessageRole
   timestamp: Date
   id: string
 }>()

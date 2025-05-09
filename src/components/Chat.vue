@@ -6,6 +6,7 @@ import { useChatStore } from '../stores/chat'
 import { useOpenAI } from '../composables/useOpenAI'
 import { onMounted, ref } from 'vue'
 import debounce from 'lodash/debounce'
+import { Message, MessageRole } from '../libs/types'
 
 const chatStore = useChatStore()
 const { streamResponse } = useOpenAI()
@@ -15,21 +16,21 @@ const autoScrollWrapper = ref()
 async function sendMessage() {
   if (!chatStore.userInput.trim()) return
 
-  const userMessage = {
+  const userMessage: Omit<Message, 'id'> = {
     text: chatStore.userInput,
-    sender: 'user' as const,
-    timestamp: new Date()
+    sender: MessageRole.User,
+    timestamp: Math.round((new Date()).getTime() / 1000),
   }
-  await chatStore.addMessage(userMessage)
+  const userMessageId = await chatStore.addMessage(userMessage)
   chatStore.clearUserInput()
 
-  const botMessage = {
+  const botMessage: Omit<Message, 'id'> = {
     text: 'Generating ...',
-    sender: 'bot' as const,
-    timestamp: new Date()
+    sender: MessageRole.Assistant,
+    timestamp: Math.round((new Date()).getTime() / 1000),
   }
-  await chatStore.addMessage(botMessage, false)
-  const botMessageId = chatStore.messages[chatStore.messages.length - 1].id
+
+  const botMessageId = await chatStore.addMessage(botMessage, userMessageId)
 
   const updateMessage = (text: string) => {
     const message = chatStore.messages.find(m => m.id === botMessageId)
@@ -53,25 +54,33 @@ async function sendMessage() {
     },
     () => {
       const message = chatStore.messages.find(m => m.id === botMessageId)
-      if(!message) return
+      if (!message) return
       message.text = responseText
-      chatStore.saveMessage({
-        ...message,
-        timestamp: new Date()
-      })
-
-      // const message = chatStore.messages.find(m => m.id === botMessageId)
-      // if (message) {
-      //   message.text += "\n\n ` `" // TODO: to trigger the final render for the last block
-      // }
+      chatStore.updateMessage(botMessageId, responseText)
     }
   )
 }
 
-onMounted(() => {
-  chatStore.loadMessages().then(() => {
-    setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 1000)
-  })
+onMounted(async () => {
+  try {
+    const conversations = await chatStore.listConversations();
+    let conversationId = ""
+
+    if (conversations.length == 0) {
+      conversationId = await chatStore.createConversation("Untitled Conversation", "")
+    }
+    else conversationId = conversations[0].id
+
+    chatStore.currentConversationId = conversationId
+    console.log('Current conversation id: ', conversationId)
+
+    chatStore.loadMessages(conversationId).then(() => {
+      setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 1000)
+    })
+  }
+  catch (error) {
+    console.error('Error loading messages:', error)
+  }
 })
 </script>
 
@@ -81,14 +90,14 @@ onMounted(() => {
       <AutoScrollWrapper ref="autoScrollWrapper" :auto="true" :throttle="256" :smooth="true">
         <div class="bubble-container">
           <MessageBubble v-for="message in chatStore.messages" :key="message.id" :text="message.text"
-            :sender="message.sender" :timestamp="message.timestamp" :id="message.id" />
+            :sender="message.sender" :timestamp="new Date(message.timestamp * 1000)" :id="message.id" />
         </div>
       </AutoScrollWrapper>
     </div>
 
     <div class="input-container">
       <n-input v-model:value="chatStore.userInput" placeholder="Type your message..." @keyup.enter="sendMessage"
-        clearable round type="textarea"/>
+        clearable round type="textarea" />
       <n-button type="primary" @click="sendMessage" round>Send</n-button>
     </div>
   </div>

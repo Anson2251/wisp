@@ -28,9 +28,12 @@ pub fn run() {
             commands::put_cached_render,
             commands::create_conversation,
             commands::add_message,
+			commands::update_message,
+			commands::delete_message,
             commands::get_conversation_thread,
             commands::delete_conversation,
             commands::list_conversations,
+			commands::update_conversation_entry_id,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

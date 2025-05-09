@@ -15,14 +15,20 @@ impl Threads {
     pub fn new(pool: DbPool, message_table_name: &str, message_primary_key: &str) -> Result<Self, ThreadError> {
         let conn = pool.get().map_err(ThreadError::Pool)?;
         conn.execute(
-            &format!("CREATE TABLE IF NOT EXISTS {} (
-                id TEXT NOT NULL,
-                parent_id TEXT NOT NULL,
-                PRIMARY KEY (id, parent_id),
-                FOREIGN KEY (id) REFERENCES {}({}) ON DELETE CASCADE,
-                FOREIGN KEY (parent_id) REFERENCES {}({}) ON DELETE CASCADE
-            )", Self::TABLE_NAME, message_table_name, message_primary_key,
-               message_table_name, message_primary_key),
+            &format!("
+				CREATE TABLE IF NOT EXISTS {} (
+					id TEXT NOT NULL,
+					parent_id TEXT,
+					PRIMARY KEY (id, parent_id),
+					FOREIGN KEY (id) REFERENCES {}({}) ON DELETE CASCADE,
+					FOREIGN KEY (parent_id) REFERENCES {}({}) ON DELETE CASCADE
+				)",
+				Self::TABLE_NAME,
+				message_table_name,
+				message_primary_key,
+				message_table_name,
+				message_primary_key
+			),
             [],
         )?;
 
@@ -30,7 +36,7 @@ impl Threads {
     }
 
 	/// Add a new thread relation.
-    pub fn add(&mut self, message_id: &str, parent_id: &str) -> Result<(), ThreadError> {
+    pub fn add(&mut self, message_id: &str, parent_id: Option<&str>) -> Result<(), ThreadError> {
         let conn = self.pool.get()?;
         conn.execute(
             &format!(
@@ -61,7 +67,7 @@ impl Threads {
     }
 
 	/// Update the parent of a thread relation.
-	pub fn update_parent(&mut self, message_id: &str, new_parent_id: &str) -> Result<(), ThreadError> {
+	pub fn update_parent(&mut self, message_id: &str, new_parent_id: Option<&str>) -> Result<(), ThreadError> {
 		let conn = self.pool.get()?;
 		conn.execute(
 			&format!(

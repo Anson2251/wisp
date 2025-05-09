@@ -17,13 +17,13 @@ impl Messages {
         conn.execute(
             &format!(
                 "CREATE TABLE IF NOT EXISTS {} (
-                id TEXT PRIMARY KEY,
-                text TEXT NOT NULL,
-                sender TEXT NOT NULL,
-                timestamp INTEGER NOT NULL,
-                tokens INTEGER,
-                embedding BLOB
-            )",
+					id TEXT PRIMARY KEY,
+					text TEXT NOT NULL,
+					sender TEXT NOT NULL,
+					timestamp INTEGER NOT NULL,
+					tokens INTEGER,
+					embedding BLOB
+				)",
                 Self::TABLE_NAME
             ),
             [],

@@ -33,7 +33,7 @@ pub async fn ask_openai_stream(app_handle: AppHandle, messages: Vec<Value>) -> R
 pub async fn create_conversation(
     app_handle: AppHandle,
     name: String,
-    description: Option<String>
+    description: String
 ) -> Result<String, String> {
     let state = app_handle.state::<Mutex<AppData>>();
 	let mut state = state.lock().unwrap();
@@ -42,7 +42,7 @@ pub async fn create_conversation(
     state.chat.create_conversation(
         &id,
         &name,
-        description.as_deref(),
+        &description,
     ).map(|_| id).map_err(|e| e.to_string())
 }
 
@@ -68,6 +68,34 @@ pub async fn add_message(
 }
 
 #[tauri::command]
+pub async fn update_message(
+	app_handle: AppHandle,
+    message_id: String,
+    text: String
+) -> Result<(), String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+	let mut state = state.lock().unwrap();
+    state.chat.update_message(
+        &message_id,
+        &text
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_message(
+    app_handle: AppHandle,
+    message_id: String,
+	recursive: bool
+) -> Result<(), String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+	let mut state = state.lock().unwrap();
+    state.chat.delete_message(
+        &message_id,
+		recursive
+    ).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_conversation_thread(
     app_handle: AppHandle,
     conversation_id: String
@@ -76,6 +104,17 @@ pub async fn get_conversation_thread(
 	let mut state = state.lock().unwrap();
 
     state.chat.get_conversation_thread(&conversation_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_conversation_entry_id(
+	app_handle: AppHandle,
+    conversation_id: String,
+	message_id: String,
+) -> Result<(), String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+	let mut state = state.lock().unwrap();
+    state.chat.conversation_manager.update_entry_message_id(&conversation_id, &message_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

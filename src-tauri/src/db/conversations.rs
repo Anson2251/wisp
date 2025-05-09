@@ -16,12 +16,12 @@ impl Conversations {
         conn.execute(
             &format!(
                 "CREATE TABLE IF NOT EXISTS {} (
-				id TEXT PRIMARY KEY,
-				name TEXT NOT NULL,
-				description TEXT,
-				entry_message_id TEXT,
-				FOREIGN KEY (entry_message_id) REFERENCES {} (id)
-			)",
+					id TEXT PRIMARY KEY,
+					name TEXT NOT NULL,
+					description TEXT,
+					entry_message_id TEXT,
+					FOREIGN KEY (entry_message_id) REFERENCES {} (id)
+				)",
                 Self::TABLE_NAME,
 				message_table_name
             ),
