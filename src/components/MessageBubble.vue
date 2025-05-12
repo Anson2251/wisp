@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NAvatar, NIcon, NButton, NFlex, NButtonGroup, useDialog } from 'naive-ui'
+import { NAvatar, NIcon, NButton, NFlex, NButtonGroup, useDialog, useThemeVars } from 'naive-ui'
 import { Chat24Regular, Person24Regular, Copy16Regular, Delete16Regular } from '@vicons/fluent'
 import MarkdownRenderer from './MarkdownRenderer.vue'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
@@ -8,12 +8,14 @@ import { useChatStore } from '../stores/chat'
 
 const { deleteMessage } = useChatStore()
 const dialog = useDialog()
+const theme = useThemeVars()
 
 const props = defineProps<{
   text: string
   sender: MessageRole
   timestamp: Date
   id: string
+  over?: boolean
 }>()
 
 const copyMessage = async () => {
@@ -47,9 +49,12 @@ const removeMessage = () => {
     <n-avatar style="position: sticky; top: 0;">
       <n-icon :component="sender === 'bot' ? Chat24Regular : Person24Regular" />
     </n-avatar>
-    <div class="message-bubble" :class="sender" :id="id">
+    <div class="message-bubble" :class="sender" :id="id" :style="{
+      '--from': sender === 'user' ? theme.primaryColor : '#eee',
+      '--to': sender === 'user' ? theme.primaryColorSuppl : '#f5f5f5'
+    }">
       <div class="content">
-        <MarkdownRenderer :text="text" :mode="'vnode'"/>
+        <MarkdownRenderer :text="text" />
       </div>
       <div class="footer" :style="{
         justifyContent: sender === 'user' ? 'flex-end' : 'flex-start',
@@ -67,7 +72,9 @@ const removeMessage = () => {
               </template>
             </n-button>
           </n-button-group>
-          <span class="timestamp">{{ timestamp.toLocaleTimeString() }}</span>
+          <span class="timestamp" :style="{
+            color: theme.textColorBase,
+          }">{{ timestamp.toLocaleTimeString() }}</span>
         </div>
       </div>
     </div>
@@ -94,13 +101,15 @@ const removeMessage = () => {
 }
 
 .message-bubble.user {
-  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  /* background: var(--bgcolor); */
+  color: white;
+  background: linear-gradient(135deg, var(--to), var(--from));
   box-shadow: 0 2px 8px rgba(38, 78, 100, 0.2), 0 1px 4px rgba(13, 62, 90, 0.2);
   margin-left: auto;
 }
 
 .message-bubble.bot {
-  background: linear-gradient(135deg, #f5f5f5, #eeeeee);
+  background: linear-gradient(135deg, var(--to), var(--from));
   box-shadow: 0 2px 8px rgba(76, 76, 76, 0.2), 0 1px 4px rgba(38, 38, 38, 0.1);
   margin-right: auto;
 }
@@ -111,9 +120,20 @@ const removeMessage = () => {
 }
 
 @keyframes flash {
-  0% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.9; transform: scale(0.98); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .content {
@@ -147,5 +167,7 @@ const removeMessage = () => {
   font-size: 0.8em;
   margin-left: 16px;
   margin-right: 8px;
+
+  width: fit-content;
 }
 </style>

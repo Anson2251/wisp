@@ -88,11 +88,13 @@ export const useChatStore = defineStore('chat', () => {
 	}
 
 	const deleteMessage = (id: string) => {
-		return new Promise<void>((resolve, reject) => {
+		return new Promise<string | null>((resolve, reject) => {
 			Commands.deleteMessage(id, false)
-				.then(() => {
-					messages.value = messages.value.filter(msg => msg.id !== id)
-					resolve()
+				.then((newParent) => {
+					// messages.value = messages.value.filter(msg => msg.id !== id)
+					const currentConv = currentConversationId.value
+					if (currentConv) loadMessages(currentConv)
+					resolve(newParent)
 				})
 				.catch((err) => {
 					console.error('[ChatStore] Failed to delete message:', err)

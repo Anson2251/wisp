@@ -34,10 +34,10 @@ export async function updateMessage(messageId: string, text: string): Promise<vo
 	});
 }
 
-export async function deleteMessage(messageId: string, recursive: boolean): Promise<void> {
-	return new Promise<void>((resolve, reject) => {
+export async function deleteMessage(messageId: string, recursive: boolean): Promise<string | null> {
+	return new Promise<string | null>((resolve, reject) => {
 		invoke('delete_message', { messageId, recursive })
-			.then(() => resolve())
+			.then((newParentId) => resolve(newParentId as (string | null)))
 			.catch((error: any) => reject(error));
 	});
 }

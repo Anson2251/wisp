@@ -86,7 +86,7 @@ pub async fn delete_message(
     app_handle: AppHandle,
     message_id: String,
 	recursive: bool
-) -> Result<(), String> {
+) -> Result<Option<String>, String> {
     let state = app_handle.state::<Mutex<AppData>>();
 	let mut state = state.lock().unwrap();
     state.chat.delete_message(

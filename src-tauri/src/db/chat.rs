@@ -167,8 +167,8 @@ impl Chat {
         Ok(())
     }
 
-    /// Deletes a message and its thread relationships
-    pub fn delete_message(&mut self, message_id: &str, recursive: bool) -> Result<(), ChatError> {
+    /// Deletes a message and its thread relationships, returns the new parent message ID if any.
+    pub fn delete_message(&mut self, message_id: &str, recursive: bool) -> Result<Option<String>, ChatError> {
         let mut conn = self.pool.get()?;
         let tx = conn.transaction()?;
 
@@ -192,21 +192,22 @@ impl Chat {
 
             // Delete the original message
             self.messages_manager.delete(message_id)?;
+
+			tx.commit()?;
+        	Ok(None)
         } else {
             let parent = self.thread_manager.get_parent(message_id)?;
-            let parent = parent.as_ref().map(|s| s.as_str());
             let children = self.thread_manager.get_children(message_id)?;
 
             // Update parent of children to the parent of the deleted message, or None if no parent exists
             for child in children {
-                self.thread_manager.update_parent(&child, parent);
+                self.thread_manager.update_parent(&child, parent.clone().as_deref());
             }
 
             // Delete message
             self.messages_manager.delete(message_id)?;
+			tx.commit()?;
+        	Ok(parent)
         }
-
-        tx.commit()?;
-        Ok(())
     }
 }

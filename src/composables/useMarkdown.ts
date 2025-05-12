@@ -1,72 +1,18 @@
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
-import remarkStringify from 'remark-stringify'
 import remarkMath from 'remark-math'
 import rehypeStringify from 'rehype-stringify'
 import rehypeSanitize from 'rehype-sanitize'
-import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
-import { rehypeVue } from 'rehype-vue'
-import rehypeMermaid from 'rehype-mermaid'
 import remarkGfm from 'remark-gfm'
 import rehypePrism from 'rehype-prism'
-import rehypeMathJaxSvg from 'rehype-mathjax/svg'
 import { h } from 'vue'
-import { NP, NEquation } from 'naive-ui'
+import { NCode, NEquation } from 'naive-ui'
+import CodeMermaidRenderer from '../components/CodeMermaidRenderer.vue'
 import { toVNode } from '../libs/to-vnode'
-import { InlineCode } from 'mdast'
+import { Code, InlineCode, Root, RootContent } from 'mdast'
 
-function createProcessor() {
-	return unified()
-		.use(remarkParse)
-		.use(remarkMath, {
-			singleDollarTextMath: true
-		})
-		.use(remarkRehype, {
-			allowDangerousHtml: true,
-		})
-		.use(rehypeRaw)
-		.use(rehypeSanitize)
-		// .use(rehypeKatex, {
-		// 	output: "mathml"
-		// })
-		.use(rehypeMathJaxSvg)
-		.use(rehypeMermaid)
-		.use(rehypePrism)
-		.use(rehypeStringify)
-}
-
-export function useStreamingMarkdownRenderer(onAppend: (html: string) => void) {
-	const processor = createProcessor()
-	const parseProcessor = unified().use(remarkParse)
-	const stringifyProcessor = unified().use(remarkStringify)
-	let buffer = ""
-
-	const onNewlyAppend = async (appended: string) => {
-		buffer += appended
-
-
-		const tree = parseProcessor.parse(buffer)
-		// console.log(tree)
-		if (tree.children.length <= 1) return
-
-		// console.log(buffer)
-
-
-		const treeCloned = JSON.parse(JSON.stringify(tree)) as (ReturnType<typeof parseProcessor.parse>);
-
-		treeCloned.children = treeCloned.children.slice(-1)
-		buffer = stringifyProcessor.stringify(treeCloned);
-
-		tree.children = tree.children.slice(0, -1)
-		onAppend((await processor.process(stringifyProcessor.stringify(tree))).toString())
-	}
-
-	return (text: string) => {
-		onNewlyAppend(text)
-	}
-}
 
 export function useVNodeRenderer() {
 	let processor = unified()
@@ -102,13 +48,34 @@ export function useVNodeRenderer() {
 	})
 
 
-	return async (text: string) => {
+	return async (text: string, enableLastMermaid: boolean = false) => {
 		try {
 			const tree = processor.parse(text)
+
+			const disableLastMermaidRc = (node: Root) => {
+				if (!node) return
+				if (!node.children) return;
+				const last = node.children[node.children.length - 1]
+				if (!last) return;
+
+				if (last.type === 'code') {
+					if (last.lang === 'mermaid') {
+						last.lang = 'mermaid-generating'
+					}
+				}
+				else {
+					disableLastMermaidRc(node.children[node.children.length - 1] as unknown as Root)
+				}
+			}
+
+			if (!enableLastMermaid) disableLastMermaidRc(tree)
+
 			const vnode = toVNode(tree, {
 				components: {
 					inlineMath: getInlineMathComponent,
-					math: getMathComponent
+					math: getMathComponent,
+					code: (node: Code) => h(CodeMermaidRenderer, { code: node.value ?? "", language: node.lang ?? "" }),
+					inlineCode: (node: InlineCode) => h(NCode, { code: node.value ?? "", inline: true, wordWrap: true, style: {transition: 'none !important'} }),
 				}
 			})
 			return vnode

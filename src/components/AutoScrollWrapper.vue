@@ -8,7 +8,7 @@ const props = defineProps<{
 }>()
 
 const container = ref<HTMLElement | null>(null)
-const throttlePixel = props.throttle ?? 48
+const throttlePixel = props.throttle ?? -1
 
 const scrollToBottom = (withThrottle = true) => {
   if (!container.value) return
@@ -17,7 +17,7 @@ const scrollToBottom = (withThrottle = true) => {
     container.value.scrollHeight) return
 
   if ((container.value.scrollTop + container.value.clientHeight <
-    container.value.scrollHeight - throttlePixel) && withThrottle) return
+    container.value.scrollHeight - (throttlePixel > 0 ? throttlePixel : container.value.scrollHeight)) && withThrottle) return
 
   container.value.scrollTo({
     top: container.value.scrollHeight,

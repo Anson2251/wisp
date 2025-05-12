@@ -4,14 +4,14 @@ import MessageBubble from './MessageBubble.vue'
 import AutoScrollWrapper from './AutoScrollWrapper.vue'
 import { useChatStore } from '../stores/chat'
 import { useOpenAI } from '../composables/useOpenAI'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, type Ref } from 'vue'
 import debounce from 'lodash/debounce'
 import { Message, MessageRole } from '../libs/types'
 
 const chatStore = useChatStore()
 const { streamResponse } = useOpenAI()
 const autoScrollWrapper = ref()
-
+const overState: Ref<boolean[]> = ref([])
 
 async function sendMessage() {
   if (!chatStore.userInput.trim()) return
@@ -31,6 +31,7 @@ async function sendMessage() {
   }
 
   const botMessageId = await chatStore.addMessage(botMessage, userMessageId)
+  overState.value.push(false)
 
   const updateMessage = (text: string) => {
     const message = chatStore.messages.find(m => m.id === botMessageId)
@@ -38,7 +39,7 @@ async function sendMessage() {
       message.text = text
     }
   }
-  const updateBubbleText = debounce(updateMessage, 50)
+  const updateBubbleText = debounce(updateMessage, 10)
   autoScrollWrapper.value?.scrollToBottom(false)
 
   let responseText = ""
@@ -53,9 +54,11 @@ async function sendMessage() {
       autoScrollWrapper.value?.scrollToBottom()
     },
     () => {
-      const message = chatStore.messages.find(m => m.id === botMessageId)
-      if (!message) return
+      const messageIndex = chatStore.messages.findIndex(m => m.id === botMessageId)
+      if (messageIndex < 0) return
+      const message = chatStore.messages[messageIndex]
       message.text = responseText
+      overState.value[messageIndex] = true
       chatStore.updateMessage(botMessageId, responseText)
     }
   )
@@ -75,6 +78,8 @@ onMounted(async () => {
     console.log('Current conversation id: ', conversationId)
 
     chatStore.loadMessages(conversationId).then(() => {
+      const messageCount = chatStore.messages.length
+      if (messageCount > 0) overState.value = Array(messageCount).fill(true)
       setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 1000)
     })
   }
@@ -87,10 +92,10 @@ onMounted(async () => {
 <template>
   <div class="chat-container">
     <div class="messages-container">
-      <AutoScrollWrapper ref="autoScrollWrapper" :auto="true" :throttle="256" :smooth="true">
+      <AutoScrollWrapper ref="autoScrollWrapper" :auto="true" :smooth="true">
         <div class="bubble-container">
-          <MessageBubble v-for="message in chatStore.messages" :key="message.id" :text="message.text"
-            :sender="message.sender" :timestamp="new Date(message.timestamp * 1000)" :id="message.id" />
+          <MessageBubble v-for="(message, index) in chatStore.messages" :key="message.id" :text="message.text"
+            :sender="message.sender" :timestamp="new Date(message.timestamp * 1000)" :id="message.id" :over="overState[index]" />
         </div>
       </AutoScrollWrapper>
     </div>

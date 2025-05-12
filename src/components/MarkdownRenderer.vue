@@ -1,40 +1,22 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
 import { computedAsync } from '@vueuse/core'
-import { useVNodeRenderer, useStreamingMarkdownRenderer } from '../composables/useMarkdown';
-
-type RenderMode = 'stream' | 'vnode';
+import { useVNodeRenderer } from '../composables/useMarkdown';
 
 const props = defineProps<{
   text: string
-  mode?: RenderMode
   mermaid?: boolean
+  over?: boolean
 }>()
-
-const mode = props.mode ?? 'html';
-const container = ref<HTMLDivElement | null>(null);
 
 // VNode mode
 const VueMdastRenderer = useVNodeRenderer();
 const content = computedAsync(async () => {
-  return await VueMdastRenderer(props.text)
+  return await VueMdastRenderer(props.text, props.over ?? true)
 });
-
-// Stream mode
-const toAppend = useStreamingMarkdownRenderer((html) => {
-  if(!container.value) return;
-  container.value.innerHTML += html;
-});
-if(mode === 'stream') {
-  watch(() => props.text, (newText) => {
-    toAppend(newText);
-  });
-}
 </script>
 
 <template>
-  <div v-if="mode === 'stream'" class="markdown-content" ref="container"></div>
-  <div v-else-if="mode === 'vnode'" style="width: 100%; height: fit-content;" class="markdown-content">
+  <div style="width: 100%; height: fit-content;" class="markdown-content">
     <component :is="content"/>
   </div>
 </template>
