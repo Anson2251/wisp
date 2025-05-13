@@ -32,4 +32,4 @@ sha2 = "0.10"
 tauri-plugin-clipboard-manager = "2"
 thiserror = "2.0.12"
 uuid = "1.16.0"
-async-openai = "0.28.1"
+async-openai = { git = "https://github.com/Anson2251/async-openai.git", version = "0.28.1" }

@@ -9,7 +9,8 @@ export function useOpenAI() {
 	const streamResponse = async (
 		messages: any[],
 		onChunk: (chunk: string) => void,
-		onFinish: () => void
+		onFinish: () => void,
+		ignoreLastMessage: boolean = false
 	) => {
 		isStreaming.value = true
 		const unlisten = await listen<string>('openai_stream_chunk', (event) => {
@@ -17,7 +18,7 @@ export function useOpenAI() {
 		})
 
 		try {
-			await invoke('ask_openai_stream', { messages: [{role: "system", content: INTERFACE_PROMPT}, ...messages] })
+			await invoke('ask_openai_stream', { messages: [{role: "system", content: INTERFACE_PROMPT}, ...(messages.slice(0, ignoreLastMessage ? -1 : undefined))] })
 		}
 		catch (error) {
 			console.error('Error streaming response:', error)

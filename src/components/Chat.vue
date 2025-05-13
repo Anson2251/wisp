@@ -25,7 +25,7 @@ async function sendMessage() {
   chatStore.clearUserInput()
 
   const botMessage: Omit<Message, 'id'> = {
-    text: 'Generating ...',
+    text: 'Generating...',
     sender: MessageRole.Assistant,
     timestamp: Math.round((new Date()).getTime() / 1000),
   }
@@ -60,7 +60,8 @@ async function sendMessage() {
       message.text = responseText
       overState.value[messageIndex] = true
       chatStore.updateMessage(botMessageId, responseText)
-    }
+    },
+    true
   )
 }
 

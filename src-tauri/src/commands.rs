@@ -44,7 +44,6 @@ pub async fn clear_diagram_cache(app_handle: AppHandle) {
 // OpenAI integration
 #[tauri::command]
 pub async fn ask_openai_stream(app_handle: AppHandle, messages: Vec<Value>) -> Result<(), String> {
-    println!("ask_openai_stream");
 	crate::api::ask_openai_stream(app_handle, messages).await.map_err(|e| e.to_string())
 }
 
