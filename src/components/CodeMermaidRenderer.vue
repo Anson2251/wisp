@@ -12,7 +12,7 @@ const props = defineProps<{
 
 <template>
   <div>
-    <mermaid-renderer v-if="props.language === 'mermaid-preview'"  :diagram="props.code" />
+    <mermaid-renderer v-if="props.language === 'mermaid-live'"  :diagram="props.code" />
     <div v-else class="code-container" :style="{
       backgroundColor: theme.cardColor,
       borderColor: theme.borderColor,

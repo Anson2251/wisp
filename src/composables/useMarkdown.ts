@@ -64,7 +64,7 @@ export function useVNodeRenderer() {
 				if (!last) return;
 
 				if (last.type === 'code') {
-					if (last.lang === 'mermaid-preview') {
+					if (last.lang === 'mermaid-live') {
 						last.lang = 'mermaid-generating'
 					}
 				}
