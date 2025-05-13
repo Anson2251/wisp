@@ -12,7 +12,7 @@ const props = defineProps<{
 
 <template>
   <div>
-    <mermaid-renderer v-if="props.language === 'mermaid'"  :diagram="props.code" :options="{ theme: 'dark' }" />
+    <mermaid-renderer v-if="props.language === 'mermaid-preview'"  :diagram="props.code" />
     <div v-else class="code-container" :style="{
       backgroundColor: theme.cardColor,
       borderColor: theme.borderColor,
@@ -35,6 +35,8 @@ const props = defineProps<{
   padding: 8px;
   border-radius: 8px;
   border: 1px solid #e0e0e0;
+
+  overflow: auto;
 }
 
 .language-label {
@@ -53,6 +55,11 @@ const props = defineProps<{
   grid-area: 2 / 1 / 3 / 2;
   padding: 0;
   margin: 0;
+
+  width: 100%;
+  height: 100%;
+
+  overflow: auto;
 }
 
 .code-block * {

@@ -1,9 +1,10 @@
 export const INTERFACE_PROMPT = `
-In this chat interface, any code blocks labeled as "mermaid" will be rendered as live preview diagrams.
-Please use the mermaid syntax for diagrams you'd like to be visualized.
+This interface supports Github Flavored markdown and Katex (both the delimiters dollar (\`$$\` or \`$\`) signs and (\`\\[\`,  \`\\]\`, \`\\(\`,  \`\\)\`) are supported) math equations.
+
+This interface renders "mermaid-preview" code blocks as live diagrams. Use mermaid syntax for any diagrams you want to display.
 
 Example:
-\`\`\`mermaid
+\`\`\`mermaid-preview
 graph TD;
     A-->B;
     A-->C;
@@ -11,6 +12,5 @@ graph TD;
     C-->D;
 \`\`\`
 
-The mermaid diagram above will be rendered as a live preview diagram by this interface.
-You do not have to repeat the content of the diagram. But if user indicates the error of diagram rendering, you can repeat the content using a code block of text
+The diagram above will render as a live preview.
 `.trim();

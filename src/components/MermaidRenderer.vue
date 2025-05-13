@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { watch, ref } from "vue"
+import { watch, ref, computed } from "vue"
 import { type RenderOptions } from "mermaid-isomorphic"
 import { useMermaid } from "../composables/useMermaid"
-import { NCode, useThemeVars } from "naive-ui";
+import { NCode, NImage, useThemeVars, GlobalThemeOverrides } from "naive-ui";
 
 const props = defineProps<{
   diagram: string,
@@ -10,8 +10,27 @@ const props = defineProps<{
 }>()
 
 const { renderDiagram } = useMermaid()
+
+const imageGroupThemeOverrides = computed(() => {
+  const { popoverColor, boxShadow2, textColor2, borderRadius }
+    = useThemeVars().value
+  const themeOverrides: NonNullable<GlobalThemeOverrides['Image']> = {
+    toolbarColor: popoverColor,
+    toolbarBoxShadow: boxShadow2,
+    toolbarIconColor: textColor2,
+    toolbarBorderRadius: borderRadius
+  }
+  return themeOverrides
+})
+
 const error = ref<string | null>(null)
 const diagramSvg = ref<string | null>(null)
+const diagramSrc = computed(() => {
+  if (diagramSvg.value) {
+    return `data:image/svg+xml;base64,${btoa(diagramSvg.value)}`
+  }
+  return null
+})
 const theme = useThemeVars()
 
 const height = ref<number>(0)
@@ -55,7 +74,9 @@ watch(() => props.diagram, updateDiagram, { immediate: true })
     <div v-else-if="!diagramSvg" class="loading">
       Rendering diagram...
     </div>
-    <div v-else-if="diagramSvg && height > 0 && width > 0" class="diagram" v-html="diagramSvg" />
+    <div v-else-if="diagramSvg && height > 0 && width > 0" class="diagram">
+      <n-image :src="diagramSrc ?? ''" :width="width" :height="height" :theme-overrides="imageGroupThemeOverrides" />
+    </div>
     <div v-else class="empty">
       No diagram to render
     </div>
@@ -93,5 +114,12 @@ watch(() => props.diagram, updateDiagram, { immediate: true })
 .diagram {
   display: flex;
   justify-content: center;
+
+  overflow: auto;
+  padding: 8px;
+
+  box-sizing: border-box;
+  width: 100%;
+  height: fit-content;
 }
 </style>

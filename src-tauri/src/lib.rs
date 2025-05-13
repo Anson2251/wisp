@@ -5,6 +5,7 @@ mod db;
 mod utils;
 use tauri::{Builder, Manager};
 use db::chat::Chat;
+use cache::DiagramCache;
 use std::sync::Mutex;
 mod types;
 use types::AppData;
@@ -16,6 +17,7 @@ pub fn run() {
 		.setup(|app| {
 			app.manage(Mutex::new(AppData {
 				chat: Chat::new(app.handle())?,
+				diagram_cache: DiagramCache::new()?,
 			}));
 			Ok(())
 		})
@@ -25,7 +27,9 @@ pub fn run() {
             commands::ask_openai_stream,
             // commands::get_cached_render,
             commands::hash_content,
-            commands::put_cached_render,
+            commands::put_cached_diagram,
+			commands::get_cached_diagram,
+			commands::clear_diagram_cache,
             commands::create_conversation,
             commands::add_message,
 			commands::update_message,

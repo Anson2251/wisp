@@ -73,3 +73,33 @@ export async function listConversations(): Promise<Conversation[]> {
 			.catch((error: any) => reject(error));
 	});
 }
+
+export interface DiagramCacheEntry {
+    svg: string;
+    height: number;
+    width: number;
+}
+
+export async function getCachedDiagram(hash: string): Promise<DiagramCacheEntry | null> {
+    return new Promise((resolve, reject) => {
+        invoke('get_cached_diagram', { hash })
+            .then((entry) => resolve(entry as DiagramCacheEntry | null))
+            .catch((error: any) => reject(error));
+    });
+}
+
+export async function putCachedDiagram(hash: string, entry: DiagramCacheEntry): Promise<void> {
+    return new Promise((resolve, reject) => {
+        invoke('put_cached_diagram', { hash, entry })
+            .then(() => resolve())
+            .catch((error: any) => reject(error));
+    });
+}
+
+export async function clearDiagramCache(): Promise<void> {
+    return new Promise((resolve, reject) => {
+        invoke('clear_diagram_cache', {})
+            .then(() => resolve())
+            .catch((error: any) => reject(error));
+    });
+}

@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use crate::{
-    cache::AstCache,
+    cache::DiagramCacheEntry,
     db::types::{Conversation, Message},
     utils::compute_content_hash,
 };
@@ -18,14 +18,34 @@ pub fn hash_content(content: String) -> String {
 }
 
 #[tauri::command]
-pub async fn put_cached_render(hash: String, ast_json: String, rendered_html: String) {
-    AstCache::new().put(&hash, &ast_json, &rendered_html);
+pub async fn get_cached_diagram(app_handle: AppHandle, hash: String) -> Option<DiagramCacheEntry> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+
+    state.diagram_cache.get(&hash).ok()
+}
+
+#[tauri::command]
+pub async fn put_cached_diagram(app_handle: AppHandle, hash: String, entry: DiagramCacheEntry) {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+
+    state.diagram_cache.put(&hash, &entry);
+}
+
+#[tauri::command]
+pub async fn clear_diagram_cache(app_handle: AppHandle) {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+
+    state.diagram_cache.clear();
 }
 
 // OpenAI integration
 #[tauri::command]
 pub async fn ask_openai_stream(app_handle: AppHandle, messages: Vec<Value>) -> Result<(), String> {
-    crate::api::ask_openai_stream(app_handle, messages).await
+    println!("ask_openai_stream");
+	crate::api::ask_openai_stream(app_handle, messages).await.map_err(|e| e.to_string())
 }
 
 // Chat operations
@@ -33,17 +53,17 @@ pub async fn ask_openai_stream(app_handle: AppHandle, messages: Vec<Value>) -> R
 pub async fn create_conversation(
     app_handle: AppHandle,
     name: String,
-    description: String
+    description: String,
 ) -> Result<String, String> {
     let state = app_handle.state::<Mutex<AppData>>();
-	let mut state = state.lock().unwrap();
+    let mut state = state.lock().unwrap();
 
     let id = get_uuid_v4();
-    state.chat.create_conversation(
-        &id,
-        &name,
-        &description,
-    ).map(|_| id).map_err(|e| e.to_string())
+    state
+        .chat
+        .create_conversation(&id, &name, &description)
+        .map(|_| id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -52,88 +72,100 @@ pub async fn add_message(
     conversation_id: String,
     text: String,
     sender: String,
-    parent_id: Option<String>
+    parent_id: Option<String>,
 ) -> Result<String, String> {
     let state = app_handle.state::<Mutex<AppData>>();
-	let mut state = state.lock().unwrap();
+    let mut state = state.lock().unwrap();
 
     let message_id = get_uuid_v4();
-    state.chat.add_message(
-        &conversation_id,
-        &message_id,
-        &text,
-        &sender,
-        parent_id.as_deref()
-    ).map(|_| message_id).map_err(|e| e.to_string())
+    state
+        .chat
+        .add_message(
+            &conversation_id,
+            &message_id,
+            &text,
+            &sender,
+            parent_id.as_deref(),
+        )
+        .map(|_| message_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn update_message(
-	app_handle: AppHandle,
+    app_handle: AppHandle,
     message_id: String,
-    text: String
+    text: String,
 ) -> Result<(), String> {
     let state = app_handle.state::<Mutex<AppData>>();
-	let mut state = state.lock().unwrap();
-    state.chat.update_message(
-        &message_id,
-        &text
-    ).map_err(|e| e.to_string())
+    let mut state = state.lock().unwrap();
+    state
+        .chat
+        .update_message(&message_id, &text)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_message(
     app_handle: AppHandle,
     message_id: String,
-	recursive: bool
+    recursive: bool,
 ) -> Result<Option<String>, String> {
     let state = app_handle.state::<Mutex<AppData>>();
-	let mut state = state.lock().unwrap();
-    state.chat.delete_message(
-        &message_id,
-		recursive
-    ).map_err(|e| e.to_string())
+    let mut state = state.lock().unwrap();
+    state
+        .chat
+        .delete_message(&message_id, recursive)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn get_conversation_thread(
     app_handle: AppHandle,
-    conversation_id: String
+    conversation_id: String,
 ) -> Result<Vec<Message>, String> {
     let state = app_handle.state::<Mutex<AppData>>();
-	let mut state = state.lock().unwrap();
+    let mut state = state.lock().unwrap();
 
-    state.chat.get_conversation_thread(&conversation_id).map_err(|e| e.to_string())
+    state
+        .chat
+        .get_conversation_thread(&conversation_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn update_conversation_entry_id(
-	app_handle: AppHandle,
+    app_handle: AppHandle,
     conversation_id: String,
-	message_id: String,
+    message_id: String,
 ) -> Result<(), String> {
     let state = app_handle.state::<Mutex<AppData>>();
-	let mut state = state.lock().unwrap();
-    state.chat.conversation_manager.update_entry_message_id(&conversation_id, &message_id).map_err(|e| e.to_string())
+    let mut state = state.lock().unwrap();
+    state
+        .chat
+        .conversation_manager
+        .update_entry_message_id(&conversation_id, &message_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_conversation(
     app_handle: AppHandle,
-    conversation_id: String
+    conversation_id: String,
 ) -> Result<(), String> {
     let state = app_handle.state::<Mutex<AppData>>();
-	let mut state = state.lock().unwrap();
+    let mut state = state.lock().unwrap();
 
-    state.chat.delete_conversation(&conversation_id).map_err(|e| e.to_string())
+    state
+        .chat
+        .delete_conversation(&conversation_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn list_conversations(
-    app_handle: AppHandle
-) -> Result<Vec<Conversation>, String> {
+pub async fn list_conversations(app_handle: AppHandle) -> Result<Vec<Conversation>, String> {
     let state = app_handle.state::<Mutex<AppData>>();
-	let mut state = state.lock().unwrap();
+    let mut state = state.lock().unwrap();
 
     state.chat.list_conversations().map_err(|e| e.to_string())
 }

@@ -18,7 +18,11 @@ export function useOpenAI() {
 
 		try {
 			await invoke('ask_openai_stream', { messages: [{role: "system", content: INTERFACE_PROMPT}, ...messages] })
-		} finally {
+		}
+		catch (error) {
+			console.error('Error streaming response:', error)
+		}
+		 finally {
 			unlisten()
 			isStreaming.value = false
 			if(onFinish) onFinish()
