@@ -3,6 +3,7 @@ import { watch, ref, computed } from "vue"
 import { type RenderOptions } from "mermaid-isomorphic"
 import { useMermaid } from "../composables/useMermaid"
 import { NCode, NImage, useThemeVars, GlobalThemeOverrides } from "naive-ui";
+import { encodeBase64 } from "../utils";
 
 const props = defineProps<{
   diagram: string,
@@ -26,10 +27,18 @@ const imageGroupThemeOverrides = computed(() => {
 const error = ref<string | null>(null)
 const diagramSvg = ref<string | null>(null)
 const diagramSrc = computed(() => {
-  if (diagramSvg.value) {
-    return `data:image/svg+xml;base64,${btoa(diagramSvg.value)}`
+  try {
+    if (diagramSvg.value) {
+
+      return `data:image/svg+xml;base64,${encodeBase64(diagramSvg.value)}`;
+    }
+    return null;
   }
-  return null
+  catch (e) {
+    console.error(e)
+    error.value = "Failed to convert diagram to base64: " + e
+    return null
+  }
 })
 const theme = useThemeVars()
 
@@ -104,6 +113,8 @@ watch(() => props.diagram, updateDiagram, { immediate: true })
 
 .loading {
   color: gray;
+  padding: 8px;
+  padding-left: 16px;
 }
 
 .empty {

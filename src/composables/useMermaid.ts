@@ -19,19 +19,19 @@ export function useMermaid() {
 
     // Check memory cache first
     if (memoryCache.value.has(cacheKey)) {
-      console.log("Memory cache hit for diagram:", diagram)
+    //   console.log("Memory cache hit for diagram:", diagram)
       return memoryCache.value.get(cacheKey)!
     }
 
     // Check SQLite cache
     const cached = await getCachedDiagram(cacheKey)
     if (cached) {
-      console.log("SQLite cache hit for diagram:", diagram)
+    //   console.log("SQLite cache hit for diagram:", diagram)
       memoryCache.value.set(cacheKey, cached)
       return cached
     }
 
-    console.log("Cache miss for diagram:", diagram)
+    // console.log("Cache miss for diagram:", diagram)
     const results = await renderer([diagram], options || {})
     if (results.length > 0) {
       const result = results[0]
