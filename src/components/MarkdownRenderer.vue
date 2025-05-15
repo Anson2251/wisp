@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computedAsync } from '@vueuse/core'
 import { useVNodeRenderer } from '../composables/useMarkdown';
+import { inject } from 'vue';
 
 const props = defineProps<{
   text: string
@@ -9,7 +10,7 @@ const props = defineProps<{
 }>()
 
 // VNode mode
-const VueMdastRenderer = useVNodeRenderer();
+const VueMdastRenderer = inject('MarkdownRenderer') as ReturnType<typeof useVNodeRenderer>
 const content = computedAsync(async () => {
   return await VueMdastRenderer(props.text, props.over ?? true)
 });

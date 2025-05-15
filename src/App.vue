@@ -3,6 +3,7 @@ import Chat from './components/Chat.vue'
 import { NDialogProvider, NConfigProvider } from 'naive-ui';
 import katex from 'katex'
 import hljs from 'highlight.js/lib/core'
+import { provide } from 'vue';
 
 import javascript from 'highlight.js/lib/languages/javascript'
 import typescript from 'highlight.js/lib/languages/typescript'
@@ -29,6 +30,11 @@ import kotlin from 'highlight.js/lib/languages/kotlin'
 import perl from 'highlight.js/lib/languages/perl'
 import lua from 'highlight.js/lib/languages/lua'
 import r from 'highlight.js/lib/languages/r'
+
+import { useOpenAI } from './composables/useOpenAI';
+const openai = useOpenAI();
+
+provide('OpenAI', openai)
 
 hljs.registerLanguage('javascript', javascript)
 hljs.registerLanguage('typescript', typescript)

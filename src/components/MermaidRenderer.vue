@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch, ref, computed } from "vue"
+import { watch, ref, computed, inject } from "vue"
 import { type RenderOptions } from "mermaid-isomorphic"
 import { useMermaid } from "../composables/useMermaid"
 import { NCode, NImage, useThemeVars, GlobalThemeOverrides } from "naive-ui";
@@ -10,7 +10,7 @@ const props = defineProps<{
   options?: RenderOptions,
 }>()
 
-const { renderDiagram } = useMermaid()
+const { renderDiagram } = inject('MermaidRenderer') as ReturnType<typeof useMermaid>
 
 const imageGroupThemeOverrides = computed(() => {
   const { popoverColor, boxShadow2, textColor2, borderRadius }

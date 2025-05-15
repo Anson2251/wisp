@@ -3,13 +3,19 @@ import { NInput, NButton } from 'naive-ui'
 import MessageBubble from './MessageBubble.vue'
 import AutoScrollWrapper from './AutoScrollWrapper.vue'
 import { useChatStore } from '../stores/chat'
-import { useOpenAI } from '../composables/useOpenAI'
-import { onMounted, ref, type Ref } from 'vue'
+import { onMounted, ref, type Ref, inject, provide } from 'vue'
 import debounce from 'lodash/debounce'
 import { Message, MessageRole } from '../libs/types'
 
+import { useOpenAI } from '../composables/useOpenAI';
+import { useMermaid } from '../composables/useMermaid';
+import { useVNodeRenderer } from '../composables/useMarkdown';
+
+provide('MermaidRenderer', useMermaid())
+provide('MarkdownRenderer', useVNodeRenderer())
+
 const chatStore = useChatStore()
-const { streamResponse } = useOpenAI()
+const { streamResponse } = inject('OpenAI') as ReturnType<typeof useOpenAI>
 const autoScrollWrapper = ref()
 const overState: Ref<boolean[]> = ref([])
 
