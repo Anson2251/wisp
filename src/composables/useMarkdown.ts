@@ -7,10 +7,10 @@ import rehypeSanitize from 'rehype-sanitize'
 import rehypeParse from 'rehype-parse'
 import rehypeStringify from 'rehype-stringify'
 import { h } from 'vue'
-import { NCode, NEquation } from 'naive-ui'
+import { NCode, NEquation, NH1, NH2, NH3, NH4, NH5, NH6, NA, NBlockquote, NUl, NOl, NLi, NText, NTable } from 'naive-ui'
 import CodeMermaidRenderer from '../components/CodeMermaidRenderer.vue'
 import { toVNode } from '../libs/to-vnode'
-import { Code, InlineCode, Root, Html } from 'mdast'
+import { Code, InlineCode, Root, Html, Heading, List } from 'mdast'
 
 
 function createMarkdownProcessor() {
@@ -82,6 +82,20 @@ export function useVNodeRenderer() {
 					code: (node: Code) => h(CodeMermaidRenderer, { code: node.value ?? "", language: node.lang ?? "" }),
 					inlineCode: (node: InlineCode) => h(NCode, { code: node.value ?? "", inline: true, wordWrap: true, style: { transition: 'none !important' } }),
 					html: (node: Html) => h('div', { innerHTML: sanitize(node.value) }),
+
+					heading: (node: Heading) => {
+						const depth = node.depth
+						const headings = [NH1, NH2, NH3, NH4, NH5, NH6]
+						return h(headings[depth - 1], {alignText: true})
+					},
+					link: NA,
+					blockquote: NBlockquote,
+					list: (node: List) => node.ordered ? NOl : NUl,
+					listItem: NLi,
+					paragraph: NText,
+					strong: h(NText, { strong: true }),
+					emphasis: h(NText, { italic: true }),
+					table: h(NTable, {bordered: true, singleLine: false}),
 				}
 			})
 			return vNode
