@@ -42,54 +42,54 @@ const content = computedAsync(async () => {
   width: fit-content;
 }
 
-.markdown-content >>> *:not(strong, em) {
+.markdown-content:deep() *:not(strong, em) {
   animation: var(--stream-fade-in);
 }
 
 
-.markdown-content >>> p {
+.markdown-content:deep() p {
   margin: 0.2em 0;
 }
 
-.markdown-content >>> h1,
-.markdown-content >>> h2,
-.markdown-content >>> h3 {
+.markdown-content:deep() h1,
+.markdown-content:deep() h2,
+.markdown-content:deep() h3 {
   margin: 0.6em 0 0.4em 0;
 }
 
-.markdown-content >>> code {
+.markdown-content:deep() code {
   background-color: #f3f3f3;
   padding: 0.2em 0.4em;
   border-radius: 3px;
   font-family: monospace;
 }
 
-.markdown-content >>> table * {
+.markdown-content:deep() table * {
   animation: none !important;
 }
 
-.markdown-content >>> pre {
+.markdown-content:deep() pre {
   background-color: #f5f5f5;
   padding: 1em;
   border-radius: 4px;
   overflow-x: auto;
 }
 
-.markdown-content >>> blockquote {
+.markdown-content:deep() blockquote {
   border-left: 3px solid #ddd;
   padding-left: 1em;
   margin-left: 0;
   color: #666;
 }
 
-.markdown-content >>> ul,
-.markdown-content >>> ol {
+.markdown-content:deep() ul,
+.markdown-content:deep() ol {
   padding-left: 1.5em;
   margin: 0.5em 0;
 }
 
-.markdown-content >>> .katex,
-.markdown-content >>> .katex >>> * {
+.markdown-content:deep() .katex,
+.markdown-content:deep() .katex:deep() * {
   user-select: none;
   -webkit-user-select: none;
 
