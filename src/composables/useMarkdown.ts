@@ -7,7 +7,7 @@ import rehypeSanitize from 'rehype-sanitize'
 import rehypeParse from 'rehype-parse'
 import rehypeStringify from 'rehype-stringify'
 import { h } from 'vue'
-import { NCode, NEquation, NH1, NH2, NH3, NH4, NH5, NH6, NA, NBlockquote, NUl, NOl, NLi, NText, NTable } from 'naive-ui'
+import { NCode, NEquation, NH1, NH2, NH3, NH4, NH5, NH6, NA, NBlockquote, NUl, NOl, NLi, NText, NTable, NDivider } from 'naive-ui'
 import CodeMermaidRenderer from '../components/CodeMermaidRenderer.vue'
 import { toVNode } from '../libs/to-vnode'
 import { Code, InlineCode, Root, Html, Heading, List } from 'mdast'
@@ -49,7 +49,7 @@ export function useVNodeRenderer() {
 			output: 'mathml'
 		},
 		value: node.value,
-		style: "font-size: 1.2em; padding: 4px"
+		style: "font-size: 1.2em; padding: 4px; display: block;"
 	})
 
 
@@ -74,7 +74,6 @@ export function useVNodeRenderer() {
 			}
 
 			if (!enableLastMermaid) disableLastMermaidRc(tree)
-
 			const vNode = toVNode(tree, {
 				components: {
 					inlineMath: getInlineMathComponent,
@@ -96,6 +95,7 @@ export function useVNodeRenderer() {
 					strong: h(NText, { strong: true }),
 					emphasis: h(NText, { italic: true }),
 					table: h(NTable, {bordered: true, singleLine: false}),
+					thematicBreak: NDivider,
 				}
 			})
 			return vNode

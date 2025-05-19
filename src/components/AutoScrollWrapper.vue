@@ -10,7 +10,7 @@ const props = defineProps<{
 const container = ref<HTMLElement | null>(null)
 const throttlePixel = props.throttle ?? -1
 
-const scrollToBottom = (withThrottle = true) => {
+const scrollToBottom = (withThrottle = true, smooth = props.smooth) => {
   if (!container.value) return
 
   if (container.value.scrollTop + container.value.clientHeight ===
@@ -21,7 +21,7 @@ const scrollToBottom = (withThrottle = true) => {
 
   container.value.scrollTo({
     top: container.value.scrollHeight,
-    behavior: props.smooth ? 'smooth' : 'auto'
+    behavior: smooth ? 'smooth' : 'auto'
   })
 }
 

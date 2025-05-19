@@ -76,6 +76,29 @@ impl Conversations {
 		}
 	}
 
+	pub fn get_by_entry_id(&mut self, id: &str) -> Result<Option<Conversation>, ConversationError> {
+		let conn = self.pool.get()?;
+		let mut stmt = conn.prepare(&format!(
+			"SELECT * FROM {} WHERE entry_message_id = ?1",
+			Self::TABLE_NAME
+		))?;
+
+		let result = stmt.query_row(params![id], |row| {
+			Ok(Conversation {
+				id: row.get(0)?,
+				name: row.get(1)?,
+				description: row.get(2)?,
+				entry_message_id: row.get(3)?,
+			})
+		});
+
+		match result {
+			Ok(conv) => Ok(Some(conv)),
+			Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+			Err(e) => Err(e.into()),
+		}
+	}
+
 	pub fn update_name(&mut self, id: &str, name: &str) -> Result<(), ConversationError> {
 		let conn = self.pool.get()?;
 		conn.execute(
@@ -100,7 +123,7 @@ impl Conversations {
 		Ok(())
 	}
 
-	pub fn update_entry_message_id(&mut self, id: &str, entry_message_id: &str) -> Result<(), ConversationError> {
+	pub fn update_entry_message_id(&mut self, id: &str, entry_message_id: Option<&str>) -> Result<(), ConversationError> {
 		let conn = self.pool.get()?;
 		conn.execute(
 			&format!(

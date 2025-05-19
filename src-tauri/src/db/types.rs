@@ -2,6 +2,13 @@ use thiserror::Error;
 use serde;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MessageNode {
+    pub message_id: String,
+	pub parent_id: Option<String>,
+    pub children: Vec<MessageNode>,
+}
+
 
 #[derive(Debug, Error)]
 pub enum ChatError {
@@ -24,6 +31,8 @@ pub enum ConversationError {
     Database(#[from] rusqlite::Error),
     #[error("Connection pool error: {0}")]
     Pool(#[from] r2d2::Error),
+	#[error("Invalid operation: {0}")]
+	InvalidOperation(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

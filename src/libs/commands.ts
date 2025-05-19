@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Message, Conversation } from "./types";
+import { Message, Conversation, MessageNode } from "./types";
 
 export async function hashContent(content: string): Promise<string> {
 	return new Promise((resolve, reject) => {
@@ -34,6 +34,14 @@ export async function updateMessage(messageId: string, text: string): Promise<vo
 	});
 }
 
+export async function getMessage(messageId: string): Promise<Message> {
+	return new Promise<Message>((resolve, reject) => {
+		invoke('get_message', { messageId })
+			.then((message) => resolve(message as Message))
+			.catch((error: any) => reject(error));
+	});
+}
+
 export async function deleteMessage(messageId: string, recursive: boolean): Promise<string | null> {
 	return new Promise<string | null>((resolve, reject) => {
 		invoke('delete_message', { messageId, recursive })
@@ -42,10 +50,18 @@ export async function deleteMessage(messageId: string, recursive: boolean): Prom
 	});
 }
 
-export async function getConversationThread(conversationId: string): Promise<Message[]> {
+export async function getAllMessageInvolved(conversationId: string): Promise<Message[]> {
 	return new Promise((resolve, reject) => {
-		invoke('get_conversation_thread', { conversationId })
+		invoke('get_all_message_involved', { conversationId })
 			.then((messages) => resolve(messages as Message[]))
+			.catch((error: any) => reject(error));
+	});
+}
+
+export async function getThreadTree(conversationId: string): Promise<MessageNode> {
+	return new Promise((resolve, reject) => {
+		invoke('get_thread_tree', { conversationId })
+			.then((threadTree) => resolve(threadTree as MessageNode))
 			.catch((error: any) => reject(error));
 	});
 }
@@ -75,31 +91,31 @@ export async function listConversations(): Promise<Conversation[]> {
 }
 
 export interface DiagramCacheEntry {
-    svg: string;
-    height: number;
-    width: number;
+	svg: string;
+	height: number;
+	width: number;
 }
 
 export async function getCachedDiagram(hash: string): Promise<DiagramCacheEntry | null> {
-    return new Promise((resolve, reject) => {
-        invoke('get_cached_diagram', { hash })
-            .then((entry) => resolve(entry as DiagramCacheEntry | null))
-            .catch((error: any) => reject(error));
-    });
+	return new Promise((resolve, reject) => {
+		invoke('get_cached_diagram', { hash })
+			.then((entry) => resolve(entry as DiagramCacheEntry | null))
+			.catch((error: any) => reject(error));
+	});
 }
 
 export async function putCachedDiagram(hash: string, entry: DiagramCacheEntry): Promise<void> {
-    return new Promise((resolve, reject) => {
-        invoke('put_cached_diagram', { hash, entry })
-            .then(() => resolve())
-            .catch((error: any) => reject(error));
-    });
+	return new Promise((resolve, reject) => {
+		invoke('put_cached_diagram', { hash, entry })
+			.then(() => resolve())
+			.catch((error: any) => reject(error));
+	});
 }
 
 export async function clearDiagramCache(): Promise<void> {
-    return new Promise((resolve, reject) => {
-        invoke('clear_diagram_cache', {})
-            .then(() => resolve())
-            .catch((error: any) => reject(error));
-    });
+	return new Promise((resolve, reject) => {
+		invoke('clear_diagram_cache', {})
+			.then(() => resolve())
+			.catch((error: any) => reject(error));
+	});
 }

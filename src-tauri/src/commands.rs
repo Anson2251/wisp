@@ -2,7 +2,7 @@ use std::sync::Mutex;
 
 use crate::{
     cache::DiagramCacheEntry,
-    db::types::{Conversation, Message},
+    db::types::{Conversation, Message, MessageNode},
     utils::compute_content_hash,
 };
 use serde_json::Value;
@@ -105,6 +105,19 @@ pub async fn update_message(
 }
 
 #[tauri::command]
+pub async fn get_message(
+    app_handle: AppHandle,
+    message_id: String,
+) -> Result<Message, String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let mut state = state.lock().unwrap();
+    state
+        .chat
+        .messages_manager.get(&message_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn delete_message(
     app_handle: AppHandle,
     message_id: String,
@@ -119,7 +132,7 @@ pub async fn delete_message(
 }
 
 #[tauri::command]
-pub async fn get_conversation_thread(
+pub async fn get_all_message_involved(
     app_handle: AppHandle,
     conversation_id: String,
 ) -> Result<Vec<Message>, String> {
@@ -128,8 +141,22 @@ pub async fn get_conversation_thread(
 
     state
         .chat
-        .get_conversation_thread(&conversation_id)
+        .get_all_message_involved(&conversation_id)
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_thread_tree(
+	app_handle: AppHandle,
+	conversation_id: String,
+) -> Result<Option<MessageNode>, String> {
+	let state = app_handle.state::<Mutex<AppData>>();
+	let mut state = state.lock().unwrap();
+
+	state
+		.chat
+		.get_thread_tree(&conversation_id)
+		.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -143,7 +170,7 @@ pub async fn update_conversation_entry_id(
     state
         .chat
         .conversation_manager
-        .update_entry_message_id(&conversation_id, &message_id)
+        .update_entry_message_id(&conversation_id, Some(&message_id))
         .map_err(|e| e.to_string())
 }
 

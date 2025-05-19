@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { NAvatar, NIcon, NButton, NFlex, NButtonGroup, useDialog, useThemeVars } from 'naive-ui'
-import { Chat24Regular, Person24Regular, Copy16Regular, Delete16Regular } from '@vicons/fluent'
+import { Chat24Regular, Person24Regular, Copy16Regular, Delete16Regular, Edit16Regular, ChevronLeft16Regular, ChevronRight16Regular } from '@vicons/fluent'
 import MarkdownRenderer from './MarkdownRenderer.vue'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { MessageRole } from '../libs/types'
 import { useChatStore } from '../stores/chat'
+import { ref } from 'vue'
+import MessageBubbleEditor from './MessageBubbleEditor.vue'
 
 const { deleteMessage } = useChatStore()
 const dialog = useDialog()
@@ -16,7 +18,11 @@ const props = defineProps<{
   timestamp: Date
   id: string
   over?: boolean
+  hasPrevious?: boolean
+  hasNext?: boolean
 }>()
+
+const emit = defineEmits(['previous', 'next'])
 
 const copyMessage = async () => {
   await writeText(props.text)
@@ -33,10 +39,16 @@ const removeMessage = () => {
     content: 'Are you sure you want to delete this message?',
     positiveText: 'Delete',
     negativeText: 'Cancel',
-    onPositiveClick: () => {
-      deleteMessage(props.id)
+    onPositiveClick: async () => {
+      await deleteMessage(props.id)
+      console.log('Message deleted:', props.id)
     }
   })
+}
+
+const showEditorModal = ref(false)
+const editMessage = () => {
+  showEditorModal.value = true
 }
 </script>
 
@@ -60,18 +72,37 @@ const removeMessage = () => {
         justifyContent: sender === 'user' ? 'flex-end' : 'flex-start',
       }">
         <div class="footer-content">
-          <n-button-group class="button-group">
-            <n-button quaternary :onclick="copyMessage" circle>
-              <template #icon>
-                <n-icon :component="Copy16Regular" />
-              </template>
-            </n-button>
-            <n-button quaternary :onclick="removeMessage" circle type="error">
-              <template #icon>
-                <n-icon :component="Delete16Regular" />
-              </template>
-            </n-button>
-          </n-button-group>
+          <n-flex align="center">
+            <n-button-group class="button-group">
+              <n-button quaternary :onclick="copyMessage" size="tiny">
+                <template #icon>
+                  <n-icon :component="Copy16Regular" :size="16"/>
+                </template>
+              </n-button>
+              <n-button quaternary :onclick="removeMessage" type="error" size="tiny">
+                <template #icon>
+                  <n-icon :component="Delete16Regular" :size="18"/>
+                </template>
+              </n-button>
+              <n-button quaternary :onclick="editMessage" size="tiny">
+                <template #icon>
+                  <n-icon :component="Edit16Regular" :size="16"/>
+                </template>
+              </n-button>
+            </n-button-group>
+            <n-button-group class="nav-group" v-if="hasPrevious || hasNext">
+              <n-button quaternary @click="emit('previous')" size="tiny" :disabled="!hasPrevious">
+                <template #icon>
+                  <n-icon :component="ChevronLeft16Regular" :size="16"/>
+                </template>
+              </n-button>
+              <n-button quaternary @click="emit('next')" size="tiny" :disabled="!hasNext">
+                <template #icon>
+                  <n-icon :component="ChevronRight16Regular" :size="16"/>
+                </template>
+              </n-button>
+            </n-button-group>
+          </n-flex>
           <span class="timestamp" :style="{
             color: theme.textColorBase,
           }">{{ timestamp.toLocaleTimeString() }}</span>
@@ -79,6 +110,7 @@ const removeMessage = () => {
       </div>
     </div>
   </n-flex>
+  <MessageBubbleEditor v-model:show="showEditorModal" :id="id" />
 </template>
 
 <style scoped>
@@ -142,7 +174,7 @@ const removeMessage = () => {
 
 .footer {
   position: absolute;
-  bottom: -38px;
+  bottom: -30px;
   left: 2px;
   padding-top: 8px;
 
@@ -161,6 +193,11 @@ const removeMessage = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
+}
+
+.nav-group {
+  margin-left: 8px;
 }
 
 .timestamp {

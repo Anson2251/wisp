@@ -1,7 +1,7 @@
 use super::conversations::Conversations;
 use super::messages::Messages;
 use super::threads::Threads;
-use super::types::{ChatError, Conversation, ConversationError, Message};
+use super::types::{ChatError, Conversation, ConversationError, Message, MessageNode};
 use super::{create_pool, DbPool};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
@@ -87,7 +87,7 @@ impl Chat {
                         rusqlite::Error::QueryReturnedNoRows,
                     )))?;
             let conv_id: &str = &conv.id;
-            self.conversation_manager.update_entry_message_id(conv_id, message_id)?;
+            self.conversation_manager.update_entry_message_id(conv_id, Some(message_id))?;
         }
 
         tx.commit()?;
@@ -95,7 +95,7 @@ impl Chat {
     }
 
     /// Gets full message thread for a conversation
-    pub fn get_conversation_thread(
+    pub fn get_all_message_involved(
         &mut self,
         conversation_id: &str,
     ) -> Result<Vec<Message>, ChatError> {
@@ -141,7 +141,7 @@ impl Chat {
         let tx = conn.transaction()?;
 
         // Get all message IDs in conversation
-        let messages = self.get_conversation_thread(conversation_id)?;
+        let messages = self.get_all_message_involved(conversation_id)?;
 
         // Delete all messages
         for message in messages {
@@ -173,7 +173,7 @@ impl Chat {
         let tx = conn.transaction()?;
 
         if recursive {
-            // Delete all children of the message recursively
+            // get all children of the message recursively
             let mut all_children = Vec::new();
             let mut current_children = self.thread_manager.get_children(message_id)?;
             while !current_children.is_empty() {
@@ -190,6 +190,15 @@ impl Chat {
                 self.messages_manager.delete(&child_id)?;
             }
 
+			let parent = self.thread_manager.get_parent(message_id)?;
+			if (parent.is_none()) {
+                let conversation = self.conversation_manager.get_by_entry_id(message_id)?
+                    .ok_or(ChatError::Conversation(ConversationError::Database(
+                        rusqlite::Error::QueryReturnedNoRows,
+                    )))?;
+                self.conversation_manager.update_entry_message_id(&conversation.id, None)?
+			}
+
             // Delete the original message
             self.messages_manager.delete(message_id)?;
 
@@ -199,15 +208,78 @@ impl Chat {
             let parent = self.thread_manager.get_parent(message_id)?;
             let children = self.thread_manager.get_children(message_id)?;
 
-            // Update parent of children to the parent of the deleted message, or None if no parent exists
-            for child in children {
-                self.thread_manager.update_parent(&child, parent.clone().as_deref());
-            }
+			match &parent {
+				Some(p) => {
+					for child in &children {
+						self.thread_manager.update_parent(child, Some(p));
+					}
+				}
+				None => { // root message
+					match children.len() {
+						0 => {
+							let conversation = self.conversation_manager.get_by_entry_id(message_id)?
+								.ok_or(ChatError::Conversation(ConversationError::Database(
+									rusqlite::Error::QueryReturnedNoRows,
+								)))?;
+							self.conversation_manager.update_entry_message_id(&conversation.id, None)?
+						}
+						1 => {
+							let conversation = self.conversation_manager.get_by_entry_id(message_id)?
+								.ok_or(ChatError::Conversation(ConversationError::Database(
+									rusqlite::Error::QueryReturnedNoRows,
+								)))?;
+							self.conversation_manager.update_entry_message_id(&conversation.id, Some(&children[0]))?
+						}
+						_ => {
+							return Err(ChatError::Conversation(ConversationError::InvalidOperation("Cannot delete root message with children".to_string())));
+						}
+					}
+				}
+			};
 
             // Delete message
             self.messages_manager.delete(message_id)?;
 			tx.commit()?;
         	Ok(parent)
         }
+    }
+
+    /// Builds a tree structure of messages starting from the entry message
+    pub fn get_thread_tree(&mut self, conversation_id: &str) -> Result<Option<MessageNode>, ChatError> {
+        let conv = self.conversation_manager
+            .get(conversation_id)?
+            .ok_or(ChatError::Conversation(ConversationError::Database(
+                rusqlite::Error::QueryReturnedNoRows,
+            )))?;
+
+        // If there's no entry message, return None
+        let Some(entry_id) = conv.entry_message_id else {
+            return Ok(None);
+        };
+
+        // Helper function to build tree recursively
+        fn build_tree(
+            chat: &mut Chat,
+            message_id: &str,
+			parent_id: Option<&str>
+        ) -> Result<MessageNode, ChatError> {
+            let message = chat.messages_manager.get(message_id)?;
+            let children_ids = chat.thread_manager.get_children(message_id)?;
+
+            let mut children = vec![];
+            for child_id in children_ids {
+                children.push(build_tree(chat, &child_id, Some(&message.id))?);
+            }
+
+            Ok(MessageNode {
+                message_id: message.id,
+				parent_id: parent_id.map(|id| id.to_string()),
+                children,
+            })
+        }
+
+        // Build the tree starting from the entry message
+        let tree = build_tree(self, &entry_id, None)?;
+        Ok(Some(tree))
     }
 }

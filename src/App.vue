@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Chat from './components/Chat.vue'
-import { NDialogProvider, NConfigProvider } from 'naive-ui';
+import { NDialogProvider, NConfigProvider, NModalProvider, NMessageProvider } from 'naive-ui';
 import katex from 'katex'
 import hljs from 'highlight.js/lib/core'
 import { provide } from 'vue';
@@ -67,11 +67,15 @@ hljs.registerLanguage('r', r)
 </script>
 
 <template>
-  <n-dialog-provider>
-    <n-config-provider :katex="(katex as any)" :hljs="hljs">
-      <Chat />
-    </n-config-provider>
-  </n-dialog-provider>
+  <n-config-provider :katex="(katex as any)" :hljs="hljs">
+    <n-dialog-provider>
+      <n-modal-provider>
+        <n-message-provider>
+          <Chat />
+        </n-message-provider>
+      </n-modal-provider>
+    </n-dialog-provider>
+  </n-config-provider>
 </template>
 
 <style>
