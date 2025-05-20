@@ -7,8 +7,9 @@ import rehypeSanitize from 'rehype-sanitize'
 import rehypeParse from 'rehype-parse'
 import rehypeStringify from 'rehype-stringify'
 import { h } from 'vue'
-import { NCode, NEquation, NH1, NH2, NH3, NH4, NH5, NH6, NA, NBlockquote, NUl, NOl, NLi, NText, NTable, NDivider } from 'naive-ui'
+import { NCode, NH1, NH2, NH3, NH4, NH5, NH6, NA, NBlockquote, NUl, NOl, NLi, NText, NTable, NDivider } from 'naive-ui'
 import CodeMermaidRenderer from '../components/CodeMermaidRenderer.vue'
+import KatexRenderer from '../components/KatexRenderer.vue'
 import { toVNode } from '../libs/to-vnode'
 import { Code, InlineCode, Root, Html, Heading, List } from 'mdast'
 
@@ -34,22 +35,24 @@ export function useVNodeRenderer() {
 
 	const sanitize = (html: string) => sanitizer.processSync(html).toString()
 
-	const getInlineMathComponent = (node: InlineCode) => h(NEquation, {
+	const getInlineMathComponent = (node: InlineCode) => h(KatexRenderer, {
 		katexOptions: {
 			displayMode: false,
 			output: 'mathml'
 		},
 		value: node.value,
-		style: "font-size: 1.15em; padding: 2px"
+		style: "font-size: 1.15em; padding: 2px;",
+		inline: true
 	})
 
-	const getMathComponent = (node: InlineCode) => h(NEquation, {
+	const getMathComponent = (node: InlineCode) => h(KatexRenderer, {
 		katexOptions: {
 			displayMode: true,
 			output: 'mathml'
 		},
 		value: node.value,
-		style: "font-size: 1.2em; padding: 4px; display: block;"
+		style: "font-size: 1.2em; padding: 4px;",
+		inline: false
 	})
 
 

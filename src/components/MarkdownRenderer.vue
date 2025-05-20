@@ -18,6 +18,7 @@ const content = computedAsync(async () => {
 
 <template>
   <div class="markdown-content" :style="{
+    width: '100%',
     '--stream-fade-in': props.over ? 'fade-in 0.6s ease-in-out' : 'none',
   }">
     <component :is="content" />
@@ -42,54 +43,56 @@ const content = computedAsync(async () => {
   width: fit-content;
 }
 
-.markdown-content:deep() *:not(strong, em) {
+.markdown-content:deep(*:not(strong, em)) {
   animation: var(--stream-fade-in);
 }
 
 
-.markdown-content:deep() p {
+.markdown-content:deep(p) {
   margin: 0.2em 0;
 }
 
-.markdown-content:deep() h1,
-.markdown-content:deep() h2,
-.markdown-content:deep() h3 {
+.markdown-content:deep(h1, h2, h3) {
   margin: 0.6em 0 0.4em 0;
 }
 
-.markdown-content:deep() code {
+.markdown-content:deep(code) {
   background-color: #f3f3f3;
-  padding: 0.2em 0.4em;
   border-radius: 3px;
   font-family: monospace;
 }
 
-.markdown-content:deep() table * {
+.markdown-content:deep(table) {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.markdown-content:deep(table:deep(*))  {
   animation: none !important;
 }
 
-.markdown-content:deep() pre {
+.markdown-content:deep(pre) {
   background-color: #f5f5f5;
   padding: 1em;
   border-radius: 4px;
   overflow-x: auto;
 }
 
-.markdown-content:deep() blockquote {
+.markdown-content:deep(blockquote) {
   border-left: 3px solid #ddd;
   padding-left: 1em;
   margin-left: 0;
   color: #666;
 }
 
-.markdown-content:deep() ul,
-.markdown-content:deep() ol {
+.markdown-content:deep(ul, ol) {
   padding-left: 1.5em;
   margin: 0.5em 0;
+  margin-block-start: 0;
+  margin-block-end: 0;
 }
 
-.markdown-content:deep() .katex,
-.markdown-content:deep() .katex:deep() * {
+.markdown-content:deep(.katex, .katex:deep(*)) {
   user-select: none;
   -webkit-user-select: none;
 
