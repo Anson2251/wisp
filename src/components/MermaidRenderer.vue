@@ -3,7 +3,7 @@ import { watch, ref, computed, inject } from "vue"
 import { type RenderOptions } from "mermaid-isomorphic"
 import { useMermaid } from "../composables/useMermaid"
 import { NCode, NImage, useThemeVars, GlobalThemeOverrides } from "naive-ui";
-import { encodeBase64 } from "../utils";
+import { encodeBase64 } from "../utils/common";
 
 const props = defineProps<{
   diagram: string,
@@ -67,13 +67,10 @@ const updateDiagram = () => {
 }
 
 watch(() => props.diagram, updateDiagram, { immediate: true })
-// updateDiagram()
 </script>
 
 <template>
   <div class="mermaid-renderer" :style="{
-    background: theme.cardColor,
-    borderColor: theme.borderColor,
     borderRadius: theme.borderRadius,
   }">
     <div v-if="error">
@@ -84,7 +81,7 @@ watch(() => props.diagram, updateDiagram, { immediate: true })
       Rendering diagram...
     </div>
     <div v-else-if="diagramSvg && height > 0 && width > 0" class="diagram">
-      <n-image :src="diagramSrc ?? ''" :width="width" :height="height" :theme-overrides="imageGroupThemeOverrides" />
+      <n-image :src="diagramSrc ?? ''" :width="width" :height="height" :theme-overrides="imageGroupThemeOverrides"/>
     </div>
     <div v-else class="empty">
       No diagram to render
@@ -100,6 +97,8 @@ watch(() => props.diagram, updateDiagram, { immediate: true })
 
   border: 1px solid #e0e0e0;
   box-sizing: border-box;
+  /* I don't know why I cannot get the mermaid rendered into dark theme */
+  background-color: white;
 }
 
 .error {

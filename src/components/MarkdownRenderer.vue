@@ -43,6 +43,12 @@ const content = computedAsync(async () => {
   width: fit-content;
 }
 
+.markdown-content:deep(*) {
+  user-select: auto !important;
+  -webkit-user-select: auto !important;
+  cursor: auto !important;
+}
+
 .markdown-content:deep(*:not(strong, em)) {
   animation: var(--stream-fade-in);
 }
@@ -52,14 +58,13 @@ const content = computedAsync(async () => {
   margin: 0.2em 0;
 }
 
-.markdown-content:deep(h1, h2, h3) {
-  margin: 0.6em 0 0.4em 0;
+.markdown-content:deep(a) {
+  text-decoration: underline;
+  cursor: pointer !important;
 }
 
-.markdown-content:deep(code) {
-  background-color: #f3f3f3;
-  border-radius: 3px;
-  font-family: monospace;
+.markdown-content:deep(h1, h2, h3) {
+  margin: 0.6em 0 0.4em 0;
 }
 
 .markdown-content:deep(table) {
@@ -71,18 +76,9 @@ const content = computedAsync(async () => {
   animation: none !important;
 }
 
-.markdown-content:deep(pre) {
-  background-color: #f5f5f5;
-  padding: 1em;
-  border-radius: 4px;
-  overflow-x: auto;
-}
-
 .markdown-content:deep(blockquote) {
-  border-left: 3px solid #ddd;
   padding-left: 1em;
   margin-left: 0;
-  color: #666;
 }
 
 .markdown-content:deep(ul, ol) {

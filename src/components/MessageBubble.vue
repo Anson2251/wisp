@@ -5,12 +5,25 @@ import MarkdownRenderer from './MarkdownRenderer.vue'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { MessageRole } from '../libs/types'
 import { useChatStore } from '../stores/chat'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import MessageBubbleEditor from './MessageBubbleEditor.vue'
+import { mixColours } from '../utils/colour'
 
 const { deleteMessage } = useChatStore()
 const dialog = useDialog()
 const theme = useThemeVars()
+
+const borderColor = computed(() =>
+  props.sender === MessageRole.User
+    ? 'transparent'
+    : theme.value.borderColor
+)
+
+const backgroundColor = computed(() =>
+  props.sender === MessageRole.User
+    ? mixColours(theme.value.primaryColor, theme.value.baseColor, 0.3)
+    : theme.value.cardColor
+)
 
 const props = defineProps<{
   text: string
@@ -62,8 +75,10 @@ const editMessage = () => {
       <n-icon :component="sender === 'bot' ? Chat24Regular : Person24Regular" />
     </n-avatar>
     <div class="message-bubble" :class="sender" :id="id" :style="{
-      '--from': sender === 'user' ? theme.primaryColor : '#eee',
-      '--to': sender === 'user' ? theme.primaryColorSuppl : '#f5f5f5'
+      'background-color': backgroundColor,
+      'border-radius': theme.borderRadius,
+      'box-shadow': theme.boxShadow1,
+      'border': `1px solid ${borderColor}`,
     }">
       <div class="content">
         <MarkdownRenderer :text="text" />
@@ -117,7 +132,6 @@ const editMessage = () => {
 .message-bubble {
   max-width: 80%;
   width: fit-content;
-  border-radius: 16px;
   padding: 12px 16px;
   margin-left: 12px;
   margin-right: 12px;
@@ -133,16 +147,13 @@ const editMessage = () => {
 }
 
 .message-bubble.user {
-  /* background: var(--bgcolor); */
   color: white;
-  background: linear-gradient(135deg, var(--to), var(--from));
-  box-shadow: 0 2px 8px rgba(38, 78, 100, 0.2), 0 1px 4px rgba(13, 62, 90, 0.2);
+  /* background: linear-gradient(135deg, var(--to), var(--from)); */
   margin-left: auto;
 }
 
 .message-bubble.bot {
-  background: linear-gradient(135deg, var(--to), var(--from));
-  box-shadow: 0 2px 8px rgba(76, 76, 76, 0.2), 0 1px 4px rgba(38, 38, 38, 0.1);
+  /* background: linear-gradient(135deg, var(--to), var(--from)); */
   margin-right: auto;
 }
 

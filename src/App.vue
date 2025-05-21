@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import Chat from './components/Chat.vue'
-import { NDialogProvider, NConfigProvider, NModalProvider, NMessageProvider } from 'naive-ui';
+import { NDialogProvider, NConfigProvider, NModalProvider, NMessageProvider, NGlobalStyle, useOsTheme, darkTheme, lightTheme } from 'naive-ui';
 import katex from 'katex'
 import hljs from 'highlight.js/lib/core'
-import { provide } from 'vue';
+import { provide, computed } from 'vue';
+import { addAlpha } from './utils/colour';
 
 import javascript from 'highlight.js/lib/languages/javascript'
 import typescript from 'highlight.js/lib/languages/typescript'
@@ -64,10 +65,23 @@ hljs.registerLanguage('perl', perl)
 hljs.registerLanguage('lua', lua)
 hljs.registerLanguage('r', r)
 
+const osThemeRef = useOsTheme()
+const isDark = computed(() => osThemeRef.value === "dark")
+const theme = computed(() =>
+  (isDark.value)
+    ? darkTheme 
+    : lightTheme
+);
+
+const themeOverrides = computed(() => ({
+  common: {
+    bodyColor: addAlpha(theme.value.common.bodyColor, (isDark.value ? 0.7 : 0.6))
+  },
+}))
 </script>
 
 <template>
-  <n-config-provider :katex="(katex as any)" :hljs="hljs">
+  <n-config-provider :katex="(katex as any)" :hljs="hljs" :theme="theme" :theme-overrides="themeOverrides" >
     <n-dialog-provider>
       <n-modal-provider>
         <n-message-provider>
@@ -75,6 +89,7 @@ hljs.registerLanguage('r', r)
         </n-message-provider>
       </n-modal-provider>
     </n-dialog-provider>
+    <n-global-style />
   </n-config-provider>
 </template>
 

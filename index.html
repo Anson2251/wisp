@@ -7,7 +7,15 @@
     <title>Tauri + Vue + Typescript App</title>
     <style>
       html, body {
-        background: rgba(255, 255, 255, 0.7);
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+
+      *:not(input, textarea, button, button *, a) {
+        user-select: none;
+        -webkit-user-select: none;
+        cursor: default;
       }
     </style>
   </head>

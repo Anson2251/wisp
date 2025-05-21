@@ -2,6 +2,24 @@ import { createMermaidRenderer, type RenderOptions } from "mermaid-isomorphic"
 import { ref, computed } from "vue"
 import { hashContent, getCachedDiagram, putCachedDiagram, clearDiagramCache } from "../libs/commands"
 
+
+function addWhiteBackgroundToSvg(svgString: string): string {
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
+    const svgElement = svgDoc.querySelector('svg');
+
+    if (!svgElement) {
+        throw new Error('Invalid SVG: Could not find <svg> element');
+    }
+
+    svgElement.setAttribute('style', 'background-color: white;')
+	svgElement.setAttribute('viewport-fill', 'white')
+
+    const serializer = new XMLSerializer();
+    return serializer.serializeToString(svgDoc);
+}
+
+
 const renderer = createMermaidRenderer()
 const memoryCache = ref(new Map<string, DiagramCacheEntry>())
 const CACHE_SIZE_LIMIT = 20
@@ -40,10 +58,13 @@ export function useMermaid() {
 			if (!result) return Promise.reject("Returned result is null or undefined")
 			if (result.status === "rejected") return Promise.reject(result.reason)
 
+			const height = Math.round(result.value.height)
+			const width = Math.round(result.value.width)
+
 			const entry = {
-				svg: result.value.svg,
-				height: Math.round(result.value.height),
-				width: Math.round(result.value.width)
+				svg: addWhiteBackgroundToSvg(result.value.svg),
+				height,
+				width
 			}
 
 			// Update both caches

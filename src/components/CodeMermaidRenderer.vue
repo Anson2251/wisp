@@ -22,6 +22,7 @@ const props = defineProps<{
       backgroundColor: theme.cardColor,
       borderColor: theme.borderColor,
       borderRadius: theme.borderRadius,
+      '--border-radius': theme.borderRadiusSmall,
     }">
       <div class="language-label-container">
         <p class="language-label">{{ props.language.toLocaleUpperCase() }}</p>
@@ -90,8 +91,11 @@ const props = defineProps<{
 .code-block {
   transition: none !important;
   animation: none !important;
-  padding: 8px;
+  padding: 8px 12px 8px 12px ;
   box-sizing: border-box;
+  border-radius: var(--border-radius);
+
+  background-color: rgba(128, 128,128, 0.1);
 }
 
 .code-block:deep(*) {
