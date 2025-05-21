@@ -28,9 +28,9 @@ tokio = { version = "1", features = ["full"] }
 rusqlite = { version = "0.35.0", features = ["bundled"] }
 r2d2 = "0.8.10"
 r2d2_sqlite = "0.28.0"
-sha2 = "0.10"
 tauri-plugin-clipboard-manager = "2"
 thiserror = "2.0.12"
 uuid = "1.16.0"
 async-openai = { git = "https://github.com/Anson2251/async-openai.git", version = "0.28.1" }
 window-vibrancy = "0.6.0"
+xxhash-rust = { version = "0.8.15", features = [ "xxh3"] }

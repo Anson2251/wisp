@@ -1,10 +1,10 @@
-use sha2::{Digest, Sha256};
+use xxhash_rust::xxh3::Xxh3;
 use uuid::Uuid;
 
 pub fn compute_content_hash(content: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(content);
-    format!("{:x}", hasher.finalize())
+    let mut hasher = Xxh3::new();
+    hasher.update(content.as_bytes());
+    format!("{:x}", hasher.digest()).to_uppercase()
 }
 
 pub fn get_uuid_v4() -> String {
