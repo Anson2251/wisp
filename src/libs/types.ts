@@ -13,12 +13,6 @@ export type Message = {
 	embedding?: Uint8Array,
 }
 
-export type MessageNode = {
-	message_id: string,
-	parent_id?: string,
-	children: MessageNode[],
-}
-
 export type Conversation = {
 	id: string,
 	name: string,

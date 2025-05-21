@@ -5,69 +5,73 @@ import { hashContent, getCachedDiagram, putCachedDiagram, clearDiagramCache } fr
 const renderer = createMermaidRenderer()
 const memoryCache = ref(new Map<string, DiagramCacheEntry>())
 const CACHE_SIZE_LIMIT = 20
+const CACHE_PRUNE_COEFFICIENT = 0.6
 
 function pruneMemoryCache() {
-  if (memoryCache.value.size > CACHE_SIZE_LIMIT) {
-    const keys = Array.from(memoryCache.value.keys())
-    memoryCache.value.delete(keys[0])
-  }
+	if (memoryCache.value.size > CACHE_SIZE_LIMIT) {
+		console.info("[useMermaid] Memory cache size exceeded limit, pruning...")
+		Array.from(memoryCache.value.keys())
+			.slice(0, memoryCache.value.size - Math.floor(CACHE_SIZE_LIMIT * CACHE_PRUNE_COEFFICIENT))
+			.forEach(key => memoryCache.value.delete(key))
+	}
 }
 
 export function useMermaid() {
-  const renderDiagram = async (diagram: string, options?: RenderOptions): Promise<DiagramCacheEntry | null> => {
-    const cacheKey = await hashContent(JSON.stringify({ diagram, options }))
+	const renderDiagram = async (diagram: string, options?: RenderOptions): Promise<DiagramCacheEntry | null> => {
+		const cacheKey = await hashContent(JSON.stringify({ diagram, options }))
 
-    // Check memory cache first
-    if (memoryCache.value.has(cacheKey)) {
-    //   console.log("Memory cache hit for diagram:", diagram)
-      return memoryCache.value.get(cacheKey)!
-    }
+		// Check memory cache first
+		if (memoryCache.value.has(cacheKey)) {
+			console.info("[useMermaid] Memory cache hit for diagram", { cacheKey })
+			return memoryCache.value.get(cacheKey)!
+		}
 
-    // Check SQLite cache
-    const cached = await getCachedDiagram(cacheKey)
-    if (cached) {
-    //   console.log("SQLite cache hit for diagram:", diagram)
-      memoryCache.value.set(cacheKey, cached)
-      return cached
-    }
+		// Check SQLite cache
+		const cached = await getCachedDiagram(cacheKey)
+		if (cached) {
+			console.info("[useMermaid] SQLite cache hit for diagram", { cacheKey })
+			memoryCache.value.set(cacheKey, cached)
+			return cached
+		}
 
-    // console.log("Cache miss for diagram:", diagram)
-    const results = await renderer([diagram], options || {})
-    if (results.length > 0) {
-      const result = results[0]
-      if (!result) return Promise.reject("Returned result is null or undefined")
-      if (result.status === "rejected") return Promise.reject(result.reason)
+		const results = await renderer([diagram], options || {})
+		if (results.length > 0) {
+			const result = results[0]
+			if (!result) return Promise.reject("Returned result is null or undefined")
+			if (result.status === "rejected") return Promise.reject(result.reason)
 
-      const entry = {
-        svg: result.value.svg,
-        height: Math.round(result.value.height),
-        width: Math.round(result.value.width)
-      }
+			const entry = {
+				svg: result.value.svg,
+				height: Math.round(result.value.height),
+				width: Math.round(result.value.width)
+			}
 
-      // Update both caches
-      memoryCache.value.set(cacheKey, entry)
-      pruneMemoryCache()
-      await putCachedDiagram(cacheKey, entry)
+			// Update both caches
+			pruneMemoryCache()
+			memoryCache.value.set(cacheKey, entry)
+			putCachedDiagram(cacheKey, entry)
+				.then(() => console.info("[useMermaid] Diagram cached in SQLite successfully", { cacheKey }))
+			console.info("[useMermaid] Cache miss, rendered diagram", { cacheKey })
+			return entry
+		}
+		return null
+	}
 
-      return entry
-    }
-    return null
-  }
+	const clearCache = async () => {
+		memoryCache.value.clear()
+		console.info("[useMermaid] Memory cache cleared")
+		await clearDiagramCache()
+	}
 
-  const clearCache = async () => {
-    memoryCache.value.clear()
-    await clearDiagramCache()
-  }
-
-  return {
-    renderDiagram,
-    clearCache,
-    cacheSize: computed(() => memoryCache.value.size)
-  }
+	return {
+		renderDiagram,
+		clearCache,
+		cacheSize: computed(() => memoryCache.value.size)
+	}
 }
 
-interface DiagramCacheEntry {
-  svg: string
-  height: number
-  width: number
+export type DiagramCacheEntry = {
+	svg: string
+	height: number
+	width: number
 }

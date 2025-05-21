@@ -2,7 +2,7 @@ use std::sync::Mutex;
 
 use crate::{
     cache::DiagramCacheEntry,
-    db::types::{Conversation, Message, MessageNode},
+    db::types::{Conversation, Message, ThreadTreeItem},
     utils::compute_content_hash,
 };
 use serde_json::Value;
@@ -149,7 +149,7 @@ pub async fn get_all_message_involved(
 pub async fn get_thread_tree(
 	app_handle: AppHandle,
 	conversation_id: String,
-) -> Result<Option<MessageNode>, String> {
+) -> Result<Vec<ThreadTreeItem>, String> {
 	let state = app_handle.state::<Mutex<AppData>>();
 	let mut state = state.lock().unwrap();
 

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Message, Conversation, MessageNode } from "./types";
+import { Message, Conversation } from "./types";
 
 export async function hashContent(content: string): Promise<string> {
 	return new Promise((resolve, reject) => {
@@ -58,10 +58,15 @@ export async function getAllMessageInvolved(conversationId: string): Promise<Mes
 	});
 }
 
-export async function getThreadTree(conversationId: string): Promise<MessageNode> {
+type GetThreadTreeResponse = {
+	key: string,
+	parent: string | null,
+	children: string[]
+}[]
+export async function getThreadTree(conversationId: string): Promise<GetThreadTreeResponse> {
 	return new Promise((resolve, reject) => {
 		invoke('get_thread_tree', { conversationId })
-			.then((threadTree) => resolve(threadTree as MessageNode))
+			.then((threadTree) => resolve(threadTree as GetThreadTreeResponse))
 			.catch((error: any) => reject(error));
 	});
 }

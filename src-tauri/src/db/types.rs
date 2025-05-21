@@ -2,13 +2,12 @@ use thiserror::Error;
 use serde;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MessageNode {
-    pub message_id: String,
-	pub parent_id: Option<String>,
-    pub children: Vec<MessageNode>,
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct ThreadTreeItem {
+	pub key: String,
+	pub parent: Option<String>,
+	pub children: Vec<String>,
 }
-
 
 #[derive(Debug, Error)]
 pub enum ChatError {

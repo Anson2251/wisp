@@ -20,6 +20,8 @@ const { streamResponse, isStreaming } = inject("OpenAI") as ReturnType<
 >;
 const autoScrollWrapper = ref();
 
+(window as any).ChatStore = chatStore
+
 async function sendMessage() {
   if (!chatStore.userInput.trim()) return;
 
@@ -58,13 +60,7 @@ async function sendMessage() {
       autoScrollWrapper.value?.scrollToBottom();
     },
     () => {
-      // const messageIndex = chatStore.messages.findIndex(
-      //   (m) => m.id === botMessageId,
-      // );
-      // if (messageIndex < 0) return;
-      // const message = chatStore.messages[messageIndex];
-      // message.text = responseText;
-      // chatStore.updateMessage(botMessageId, responseText);
+      chatStore.updateMessage(botMessageId, responseText);
     },
     true,
   );

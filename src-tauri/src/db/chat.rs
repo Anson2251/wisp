@@ -1,7 +1,7 @@
 use super::conversations::Conversations;
 use super::messages::Messages;
 use super::threads::Threads;
-use super::types::{ChatError, Conversation, ConversationError, Message, MessageNode};
+use super::types::{ChatError, Conversation, ConversationError, Message, ThreadTreeItem};
 use super::{create_pool, DbPool};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
@@ -245,41 +245,32 @@ impl Chat {
     }
 
     /// Builds a tree structure of messages starting from the entry message
-    pub fn get_thread_tree(&mut self, conversation_id: &str) -> Result<Option<MessageNode>, ChatError> {
+    pub fn get_thread_tree(&mut self, conversation_id: &str) -> Result<Vec<ThreadTreeItem>, ChatError> {
         let conv = self.conversation_manager
             .get(conversation_id)?
             .ok_or(ChatError::Conversation(ConversationError::Database(
                 rusqlite::Error::QueryReturnedNoRows,
             )))?;
 
-        // If there's no entry message, return None
+        // If there's no entry message, return an empty tree
         let Some(entry_id) = conv.entry_message_id else {
-            return Ok(None);
+            return Ok(vec![]);
         };
 
-        // Helper function to build tree recursively
-        fn build_tree(
-            chat: &mut Chat,
-            message_id: &str,
-			parent_id: Option<&str>
-        ) -> Result<MessageNode, ChatError> {
-            let message = chat.messages_manager.get(message_id)?;
-            let children_ids = chat.thread_manager.get_children(message_id)?;
+		let mut result: Vec<ThreadTreeItem> = vec![];
+		let mut stack = vec![entry_id.clone()];
 
-            let mut children = vec![];
-            for child_id in children_ids {
-                children.push(build_tree(chat, &child_id, Some(&message.id))?);
-            }
+		while let Some(message_id) = stack.pop() {
+			let children_ids = self.thread_manager.get_children(&message_id)?;
+			let parent_id = self.thread_manager.get_parent(&message_id)?;
+			result.push(ThreadTreeItem {
+				key: message_id.clone(),
+				parent: parent_id,
+				children: children_ids.clone(),
+			});
+			stack.extend(children_ids);
+		}
 
-            Ok(MessageNode {
-                message_id: message.id,
-				parent_id: parent_id.map(|id| id.to_string()),
-                children,
-            })
-        }
-
-        // Build the tree starting from the entry message
-        let tree = build_tree(self, &entry_id, None)?;
-        Ok(Some(tree))
+        Ok(result)
     }
 }
