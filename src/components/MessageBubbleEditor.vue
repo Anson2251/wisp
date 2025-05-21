@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { NModal, NButton, NButtonGroup, useMessage } from 'naive-ui';
+import { NModal, NButton, NButtonGroup, useMessage, useOsTheme } from 'naive-ui';
 import { Codemirror } from 'vue-codemirror';
+import { Compartment } from '@codemirror/state';
+import { oneDark } from '@codemirror/theme-one-dark'
+import { vsCodeLight } from '@fsegurai/codemirror-theme-vscode-light';
+import { basicSetup, EditorView } from 'codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { ref, watch } from 'vue';
 import { useChatStore } from '../stores/chat';
@@ -15,6 +19,19 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:show', value: boolean): void
 }>()
+
+const editorTheme = new Compartment();
+const osThemeRef = useOsTheme()
+const extensions = [markdown(), basicSetup, editorTheme.of(osThemeRef.value === 'dark' ? oneDark : vsCodeLight)]
+
+const handleReady = (payload: any) => {
+  const cmEditor = payload.view as EditorView
+  watch(osThemeRef, (theme) => {
+    cmEditor.dispatch({
+      effects: editorTheme.reconfigure(theme === 'dark' ? oneDark : vsCodeLight)
+    })
+  })
+}
 
 const code = ref<string>("")
 const loadingSave = ref(false)
@@ -63,26 +80,22 @@ const updateMessageLocal = (id: string, text: string, resend = false) => {
     :preset="'card'" :draggable="true" title="Edit Message" :bordered="false" size="small" :content-style="{
       minHeight: 0,
       minWidth: 0,
-    }"
-    :style="{
+    }" :style="{
       width: '600px',
       height: '400px',
     }">
     <div class="editor-container">
-    <codemirror
-      auto-focus
-      v-model="code"
-      style="height: 100%; width: 100%;"
-      :extensions="[markdown()]"
-
-    />
+      <codemirror auto-focus v-model="code" style="height: 100%; width: 100%;" :extensions="extensions"
+        @ready="handleReady" />
     </div>
     <template #footer>
       <div class="footer">
-        <n-button @click="emit('update:show', false)" >Cancel</n-button>
+        <n-button @click="emit('update:show', false)">Cancel</n-button>
         <n-button-group>
-          <n-button @click="updateMessageLocal(props.id, code, false)" type="primary" :loading="loadingSave">Save</n-button>
-          <n-button @click="updateMessageLocal(props.id, code, true)" type="primary" :loading="loadingResend">Resend</n-button>
+          <n-button @click="updateMessageLocal(props.id, code, false)" type="primary"
+            :loading="loadingSave">Save</n-button>
+          <n-button @click="updateMessageLocal(props.id, code, true)" type="primary"
+            :loading="loadingResend">Resend</n-button>
         </n-button-group>
       </div>
     </template>
@@ -98,6 +111,12 @@ const updateMessageLocal = (id: string, text: string, resend = false) => {
 
   min-width: none;
   min-height: none;
+}
+
+.editor-container:deep(*) {
+  cursor: auto;
+  user-select: auto;
+  -webkit-user-select: auto;
 }
 
 .footer {
