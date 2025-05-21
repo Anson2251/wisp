@@ -27,8 +27,6 @@ export const useChatStore = defineStore('chat', () => {
 		let node = root
 		let index = 0
 
-		console.log("[ChatStore] Default decisions", { root, prev })
-
 		while (node) {
 			const children = threadTree.value.get(node) ?? []
 			if (children.length > 0) {
@@ -47,7 +45,6 @@ export const useChatStore = defineStore('chat', () => {
 
 	const displayedMessages = ref<MessageDisplay[]>([])
 	watch([threadTreeDecisions, threadTree, rootMessageId, lastMessageId], () => {
-		console.log("[ChatStore] Displayed messages computed")
 		if (threadTreeDecisions.value.length < 1
 			|| !threadTree.value
 			|| !rootMessageId.value
@@ -55,6 +52,9 @@ export const useChatStore = defineStore('chat', () => {
 			console.log("[ChatStore] No decisions or tree or root message id")
 			return [] as MessageDisplay[]
 		}
+
+		const timingIdentifier = "[ChatStore] Displayed messages re-computed"
+		console.time(timingIdentifier)
 
 		const fullDecisions = Object.freeze(threadTreeDecisions.value)
 		const messagesLocal: MessageDisplay[] = []
@@ -91,6 +91,7 @@ export const useChatStore = defineStore('chat', () => {
 		}
 
 		displayedMessages.value = messagesLocal;
+		console.timeEnd(timingIdentifier)
 	})
 
 	const loadThreadTree = async (conversationId: string) => {
@@ -155,12 +156,15 @@ export const useChatStore = defineStore('chat', () => {
 
 	const loadConversation = async (conversationId: string) => {
 		try {
+			const identifier = '[ChatStore] Time to load conversation'
+			console.time(identifier)
 			await loadMessages(conversationId)
 			await loadThreadTree(conversationId)
 
 			// root message has been set in loadThreadTree
 			threadTreeDecisions.value = getDefaultThreadTreeDecisions(rootMessageId.value!)
 			lastMessageId.value = useDecisionToGetLastMessageId(threadTree.value, rootMessageId.value!)
+			console.timeEnd(identifier)
 		}
 		catch (err) {
 			console.error('[ChatStore] Failed to load conversation:', err, { conversationId })

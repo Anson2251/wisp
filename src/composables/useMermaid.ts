@@ -37,45 +37,53 @@ function pruneMemoryCache() {
 export function useMermaid() {
 	const renderDiagram = async (diagram: string, options?: RenderOptions): Promise<DiagramCacheEntry | null> => {
 		const cacheKey = await hashContent(JSON.stringify({ diagram, options }))
+		const render = async () => {
 
-		// Check memory cache first
-		if (memoryCache.value.has(cacheKey)) {
-			console.info("[useMermaid] Memory cache hit for diagram", { cacheKey })
-			return memoryCache.value.get(cacheKey)!
-		}
-
-		// Check SQLite cache
-		const cached = await getCachedDiagram(cacheKey)
-		if (cached) {
-			console.info("[useMermaid] SQLite cache hit for diagram", { cacheKey })
-			memoryCache.value.set(cacheKey, cached)
-			return cached
-		}
-
-		const results = await renderer([diagram], options || {})
-		if (results.length > 0) {
-			const result = results[0]
-			if (!result) return Promise.reject("Returned result is null or undefined")
-			if (result.status === "rejected") return Promise.reject(result.reason)
-
-			const height = Math.round(result.value.height)
-			const width = Math.round(result.value.width)
-
-			const entry = {
-				svg: addWhiteBackgroundToSvg(result.value.svg),
-				height,
-				width
+			// Check memory cache first
+			if (memoryCache.value.has(cacheKey)) {
+				console.info("[useMermaid] Memory cache hit for diagram", { cacheKey })
+				return memoryCache.value.get(cacheKey)!
 			}
 
-			// Update both caches
-			pruneMemoryCache()
-			memoryCache.value.set(cacheKey, entry)
-			putCachedDiagram(cacheKey, entry)
-				.then(() => console.info("[useMermaid] Diagram cached in SQLite successfully", { cacheKey }))
-			console.info("[useMermaid] Cache miss, rendered diagram", { cacheKey })
-			return entry
+			// Check SQLite cache
+			const cached = await getCachedDiagram(cacheKey)
+			if (cached) {
+				console.info("[useMermaid] SQLite cache hit for diagram", { cacheKey })
+				memoryCache.value.set(cacheKey, cached)
+				return cached
+			}
+
+			const results = await renderer([diagram], options || {})
+			if (results.length > 0) {
+				const result = results[0]
+				if (!result) return Promise.reject("Returned result is null or undefined")
+				if (result.status === "rejected") return Promise.reject(result.reason)
+
+				const height = Math.round(result.value.height)
+				const width = Math.round(result.value.width)
+
+				const entry = {
+					svg: addWhiteBackgroundToSvg(result.value.svg),
+					height,
+					width
+				}
+
+				// Update both caches
+				pruneMemoryCache()
+				memoryCache.value.set(cacheKey, entry)
+				putCachedDiagram(cacheKey, entry)
+					.then(() => console.info("[useMermaid] Diagram cached in SQLite successfully", { cacheKey }))
+				console.info("[useMermaid] Cache miss, rendered diagram", { cacheKey })
+				return entry
+			}
+			return null
 		}
-		return null
+
+		const identifier = `[useMermaid] Render diagram (${cacheKey})`
+		console.time(identifier)
+		const result = await render()
+		console.timeEnd(identifier)
+		return result
 	}
 
 	const clearCache = async () => {

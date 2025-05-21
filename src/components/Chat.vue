@@ -108,7 +108,7 @@ onMounted(async () => {
             :sender="message.sender"
             :timestamp="new Date(message.timestamp * 1000)"
             :id="message.id"
-            :over="index === chatStore.displayedMessage.length - 1 && isStreaming"
+            :over="index === chatStore.displayedMessage.length - 1 || !isStreaming"
             :hasPrevious="message.hasPrevious"
             :hasNext="message.hasNext"
             @previous="() => navigateToSibling(index, -1)"

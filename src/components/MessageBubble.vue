@@ -81,7 +81,7 @@ const editMessage = () => {
       'border': `1px solid ${borderColor}`,
     }">
       <div class="content">
-        <MarkdownRenderer :text="text" />
+        <MarkdownRenderer :text="text" :over="over" />
       </div>
       <div class="footer" :style="{
         justifyContent: sender === 'user' ? 'flex-end' : 'flex-start',
