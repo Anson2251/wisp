@@ -77,7 +77,7 @@ const editMessage = () => {
     <div class="message-bubble" :class="sender" :id="id" :style="{
       'background-color': backgroundColor,
       'border-radius': theme.borderRadius,
-      'box-shadow': theme.boxShadow1,
+      'box-shadow': theme.boxShadow2,
       'border': `1px solid ${borderColor}`,
     }">
       <div class="content">

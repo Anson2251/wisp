@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { NModal, NButton, NButtonGroup, useMessage, useOsTheme } from 'naive-ui';
+import { NButton, NButtonGroup, useMessage, useOsTheme } from 'naive-ui';
+import Window from './Window.vue';
 import { Codemirror } from 'vue-codemirror';
 import { Compartment } from '@codemirror/state';
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -54,6 +55,10 @@ const setLoadingState = (loading: boolean, resend: boolean = false) => {
   else loadingSave.value = loading
 }
 
+const closeEditor = () => {
+  emit('update:show', false)
+}
+
 watch(() => props.show, (newValue) => {
   if (newValue) loadMessage()
 })
@@ -64,7 +69,7 @@ const updateMessageLocal = (id: string, text: string, resend = false) => {
   chat.updateMessage(id, text).then(() => {
     setLoadingState(false, resend)
 
-    setTimeout(() => emit('update:show', false))
+    setTimeout(() => closeEditor)
 
     if (resend) {
       message.error("Not implemented yet")
@@ -76,21 +81,16 @@ const updateMessageLocal = (id: string, text: string, resend = false) => {
 </script>
 
 <template>
-  <n-modal v-bind:show="show" v-on:update:show="value => emit('update:show', value)" class="custom-card"
-    :preset="'card'" :draggable="true" title="Edit Message" :bordered="false" size="small" :content-style="{
-      minHeight: 0,
-      minWidth: 0,
-    }" :style="{
-      width: '600px',
-      height: '400px',
-    }">
-    <div class="editor-container">
-      <codemirror auto-focus v-model="code" style="height: 100%; width: 100%;" :extensions="extensions"
-        @ready="handleReady" />
-    </div>
+  <window v-if="show" @close="closeEditor" title="Message Editor">
+    <template #default>
+      <div class="editor-container">
+        <codemirror auto-focus v-model="code" style="height: 100%; width: 100%;" :extensions="extensions"
+          @ready="handleReady" />
+      </div>
+    </template>
     <template #footer>
       <div class="footer">
-        <n-button @click="emit('update:show', false)">Cancel</n-button>
+        <n-button @click="closeEditor">Cancel</n-button>
         <n-button-group>
           <n-button @click="updateMessageLocal(props.id, code, false)" type="primary"
             :loading="loadingSave">Save</n-button>
@@ -99,7 +99,7 @@ const updateMessageLocal = (id: string, text: string, resend = false) => {
         </n-button-group>
       </div>
     </template>
-  </n-modal>
+  </window>
 </template>
 
 <style scoped>

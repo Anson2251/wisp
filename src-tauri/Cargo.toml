@@ -34,3 +34,8 @@ uuid = "1.16.0"
 async-openai = { git = "https://github.com/Anson2251/async-openai.git", version = "0.28.1" }
 window-vibrancy = "0.6.0"
 xxhash-rust = { version = "0.8.15", features = [ "xxh3"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "z"
