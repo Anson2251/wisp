@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NButtonGroup, useMessage, useOsTheme } from 'naive-ui';
+import { NButton, NButtonGroup, useOsTheme } from 'naive-ui';
 import Window from './Window.vue';
 import { Codemirror } from 'vue-codemirror';
 import { Compartment } from '@codemirror/state';
@@ -10,7 +10,6 @@ import { markdown } from '@codemirror/lang-markdown'
 import { ref, watch } from 'vue';
 import { useChatStore } from '../stores/chat';
 
-const message = useMessage()
 const chat = useChatStore()
 
 const props = defineProps<{
@@ -19,6 +18,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   (e: 'update:show', value: boolean): void
+  (e: 'resend', derive: boolean, text: string): void
 }>()
 
 const editorTheme = new Compartment();
@@ -50,9 +50,8 @@ const loadMessage = () => {
   })
 }
 
-const setLoadingState = (loading: boolean, resend: boolean = false) => {
-  if (resend) loadingResend.value = loading
-  else loadingSave.value = loading
+const setLoadingState = (loading: boolean) => {
+  loadingResend.value = loading
 }
 
 const closeEditor = () => {
@@ -63,20 +62,22 @@ watch(() => props.show, (newValue) => {
   if (newValue) loadMessage()
 })
 
-const updateMessageLocal = (id: string, text: string, resend = false) => {
-  setLoadingState(true, resend)
+const updateMessageLocal = (text: string) => {
+  setLoadingState(true)
 
-  chat.updateMessage(id, text).then(() => {
-    setLoadingState(false, resend)
+  chat.updateMessage(props.id, text)
+    .then(() => {
+      setLoadingState(false)
+      closeEditor()
+    })
+    .catch((error) => {
+      console.error("Failed to update message:", error)
+    })
+}
 
-    setTimeout(() => closeEditor)
-
-    if (resend) {
-      message.error("Not implemented yet")
-    }
-  }).catch((error) => {
-    console.error("Failed to update message:", error)
-  })
+const resendMessageLocal = (text: string) => {
+  emit('resend', true, text)
+  closeEditor()
 }
 </script>
 
@@ -92,9 +93,9 @@ const updateMessageLocal = (id: string, text: string, resend = false) => {
       <div class="footer">
         <n-button @click="closeEditor">Cancel</n-button>
         <n-button-group>
-          <n-button @click="updateMessageLocal(props.id, code, false)" type="primary"
+          <n-button @click="updateMessageLocal(code)" type="primary"
             :loading="loadingSave">Save</n-button>
-          <n-button @click="updateMessageLocal(props.id, code, true)" type="primary"
+          <n-button @click="resendMessageLocal(code)" type="primary"
             :loading="loadingResend">Resend</n-button>
         </n-button-group>
       </div>

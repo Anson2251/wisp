@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NAvatar, NIcon, NButton, NFlex, NButtonGroup, useDialog, useThemeVars } from 'naive-ui'
-import { Chat24Regular, Person24Regular, Copy16Regular, Delete16Regular, Edit16Regular, ChevronLeft16Regular, ChevronRight16Regular } from '@vicons/fluent'
+import { Chat24Regular, Person24Regular, Copy16Regular, Delete16Regular, Edit16Regular, ArrowClockwise16Regular, ChevronLeft16Regular, ChevronRight16Regular } from '@vicons/fluent'
 import MarkdownRenderer from './MarkdownRenderer.vue'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { MessageRole } from '../libs/types'
@@ -35,7 +35,12 @@ const props = defineProps<{
   hasNext?: boolean
 }>()
 
-const emit = defineEmits(['previous', 'next'])
+const emit = defineEmits<{
+  (e: "resend", derive: boolean, text: string): void,
+  (e: "regenerate"): void,
+  (e: 'previous'): void,
+  (e: 'next'): void,
+}>()
 
 const copyMessage = async () => {
   await writeText(props.text)
@@ -66,7 +71,7 @@ const editMessage = () => {
 </script>
 
 <template>
-  <n-flex align="start" :wrap-item="false" :style="{
+  <n-flex align="start" :wrap="false" :style="{
     flexDirection: sender === 'user' ? 'row-reverse' : 'row',
     alignItems: 'flex-start',
     marginBottom: '12px'
@@ -87,7 +92,7 @@ const editMessage = () => {
         justifyContent: sender === 'user' ? 'flex-end' : 'flex-start',
       }">
         <div class="footer-content">
-          <n-flex align="center">
+          <n-flex :wrap="false" align="center">
             <n-button-group class="button-group">
               <n-button quaternary :onclick="copyMessage" size="tiny">
                 <template #icon>
@@ -97,6 +102,11 @@ const editMessage = () => {
               <n-button quaternary :onclick="removeMessage" type="error" size="tiny">
                 <template #icon>
                   <n-icon :component="Delete16Regular" :size="18"/>
+                </template>
+              </n-button>
+              <n-button quaternary @click="emit('regenerate')" size="tiny" v-if="sender === 'bot'">
+                <template #icon>
+                  <n-icon :component="ArrowClockwise16Regular" :size="16"/>
                 </template>
               </n-button>
               <n-button quaternary :onclick="editMessage" size="tiny">
@@ -125,7 +135,7 @@ const editMessage = () => {
       </div>
     </div>
   </n-flex>
-  <MessageBubbleEditor v-model:show="showEditorModal" :id="id" />
+  <MessageBubbleEditor v-model:show="showEditorModal" :id="id" @resend="(derive, text) => emit('resend', derive, text)"/>
 </template>
 
 <style scoped>
@@ -217,5 +227,6 @@ const editMessage = () => {
   margin-right: 8px;
 
   width: fit-content;
+  font-family: monospace;
 }
 </style>

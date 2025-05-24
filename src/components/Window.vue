@@ -209,6 +209,7 @@ onUnmounted(() => {
     top: `${y}px`,
     width: `${width}px`,
     height: `${height}px`,
+    border: isMaximized ? 'none' : `1px solid ${themeVars.borderColor}`,
     zIndex
   }">
     <!-- Title Bar (draggable) -->
@@ -270,7 +271,6 @@ onUnmounted(() => {
   animation: fade-in 0.1s v-bind('themeVars.cubicBezierEaseIn');
   background-color: v-bind('themeVars.cardColor');
   color: v-bind('themeVars.textColor1');
-  border: 1px solid v-bind('themeVars.borderColor');
   border-radius: v-bind('isMaximized ? 0 : themeVars.borderRadius');
   box-shadow: v-bind('themeVars.boxShadow1');
   display: flex;
@@ -278,6 +278,7 @@ onUnmounted(() => {
   overflow: hidden;
 
   box-sizing: border-box;
+  transition: background-color, color, border-radius, box-shadow 0.2s v-bind('themeVars.cubicBezierEaseInOut');
 }
 
 .title-bar {

@@ -1,7 +1,11 @@
 import { defineStore } from 'pinia'
-import { ref, watch, type ComputedRef, computed } from 'vue'
+import { ref, watch, type ComputedRef, computed, reactive } from 'vue'
 import type { Message, Conversation } from '../libs/types'
 import * as Commands from '../libs/commands'
+import MessageThreadTree from '../libs/message-thread-tree'
+import { MessageRole } from '../libs/types';
+import debounce from "lodash/debounce";
+import { useOpenAI } from '../composables/useOpenAI'
 
 type MessageDisplay = Omit<Message, 'text'> & {
 	over: boolean,
@@ -13,8 +17,7 @@ type MessageDisplay = Omit<Message, 'text'> & {
 export const useChatStore = defineStore('chat', () => {
 	const userInput = ref('')
 	const currentConversationId = ref<string | null>(null)
-	const threadTree = ref(new Map<string, readonly string[]>())
-	const lastMessageId = ref<string | null>(null)
+	const threadTree = reactive<MessageThreadTree>(new MessageThreadTree())
 	const rootMessageId = ref<string | null>(null)
 	const conversations = ref<{ id: string, name: string }[]>([])
 
@@ -22,13 +25,105 @@ export const useChatStore = defineStore('chat', () => {
 
 	const threadTreeDecisions = ref<number[]>([])
 
+	const { streamResponse, isStreaming } = useOpenAI()
+
+
+	type SendMessageCallbacks = {
+		beforeSend: (botMessageId: string) => void;
+		onReceiving: (chunk: string) => void;
+	}
+	const sendMessage = async (message: Omit<Message, 'id'>, { beforeSend, onReceiving }: Partial<SendMessageCallbacks>, parentMessageId = lastMessageId.value ?? undefined) => {
+		const userMessageId = await addMessage(message, parentMessageId, true);
+
+		const botMessage: Omit<Message, "id"> = {
+			text: "Generating...",
+			sender: MessageRole.Assistant,
+			timestamp: Math.round(new Date().getTime() / 1000),
+		};
+		const botMessageId = await addMessage(botMessage, userMessageId, true);
+
+		const updateMessageLocal = (text: string) => {
+			const message = messages.value.get(botMessageId);
+			if (message) messages.value.set(botMessageId, { ...message, text });
+		};
+		const updateBubbleText = debounce(updateMessageLocal, 10);
+		if (beforeSend) beforeSend(botMessageId)
+
+		let responseText = "";
+		await streamResponse(
+			displayedMessages.value.map((msg) => ({
+				role: msg.sender === "user" ? "user" : "assistant",
+				content: msg.text,
+			})),
+			(chunk) => {
+				responseText += chunk;
+				updateBubbleText(responseText);
+				if (onReceiving) onReceiving(chunk)
+			},
+			() => {
+				updateMessage(botMessageId, responseText);
+			},
+			true,
+		);
+	}
+
+	const regenerateMessage = async (messageId: string, { beforeSend, onReceiving }: Partial<SendMessageCallbacks>, insertGuidance = false) => {
+		const parentId = threadTree.getParentId(messageId)
+		if (!parentId) return Promise.reject("Cannot regenerate the root message");
+
+		const botMessage: Omit<Message, "id"> = {
+			text: "Generating...",
+			sender: MessageRole.Assistant,
+			timestamp: Math.round(new Date().getTime() / 1000),
+		};
+		const botMessageId = await addMessage(botMessage, parentId, true);
+
+		const updateMessageLocal = (text: string) => {
+			const message = messages.value.get(botMessageId);
+			if (message) messages.value.set(botMessageId, { ...message, text });
+		};
+		const updateBubbleText = debounce(updateMessageLocal, 10);
+		if (beforeSend) beforeSend(botMessageId)
+
+		let responseText = "";
+		await streamResponse(
+			displayedMessages.value.map((msg) => ({
+				role: msg.sender === "user" ? "user" : "assistant",
+				content: msg.text,
+			})),
+			(chunk) => {
+				responseText += chunk;
+				updateBubbleText(responseText);
+				if (onReceiving) onReceiving(chunk)
+			},
+			() => {
+				updateMessage(botMessageId, responseText);
+			},
+			true,
+			insertGuidance
+		);
+	}
+
+	const deriveMessage = async (replacedMessageId: string, text: string, {beforeSend, onReceiving}: Partial<SendMessageCallbacks>) => {
+		const message: Omit<Message, 'id'> = {
+			text,
+			sender: MessageRole.User,
+			timestamp: Date.now(),
+		}
+
+		const parent = threadTree.getParentId(replacedMessageId)
+		if (!parent) return Promise.reject("Root message cannot be derived")
+
+		sendMessage(message, {beforeSend, onReceiving}, parent)
+	}
+
 	const getDefaultThreadTreeDecisions = (root: string, prev: number[] = []) => {
 		const path: number[] = []
 		let node = root
 		let index = 0
 
 		while (node) {
-			const children = threadTree.value.get(node) ?? []
+			const children = threadTree.getChildren(node)
 			if (children.length > 0) {
 				const decision = (prev[index] ?? 0) % children.length
 				node = children[decision]
@@ -43,21 +138,39 @@ export const useChatStore = defineStore('chat', () => {
 		return path;
 	}
 
+	const getDisplayedMessageListIds = (fullDecisions: readonly number[], root: string) => {
+		const messagesLocal: { id: string, hasPrev: boolean, hasNext: boolean }[] = []
+		let node = root
+		messagesLocal.push({ id: node, hasPrev: false, hasNext: false })
+
+		for (const decision of fullDecisions) {
+			const children = threadTree.getChildren(node)
+			if (children.length > 0) {
+				if (!children[decision]) break;
+				node = children[decision]
+				if (!node) break;
+				messagesLocal.push({ id: node, hasNext: decision < children.length - 1, hasPrev: decision > 0 })
+			}
+		}
+
+		return messagesLocal;
+	}
+
 	const displayedMessages = ref<MessageDisplay[]>([])
-	watch([threadTreeDecisions, threadTree, rootMessageId, lastMessageId], () => {
+	const lastMessageId = computed(() => displayedMessages.value.length > 0 ? displayedMessages.value[displayedMessages.value.length - 1].id : null)
+	watch([threadTreeDecisions, threadTree, rootMessageId], () => {
 		if (threadTreeDecisions.value.length < 1
-			|| !threadTree.value
 			|| !rootMessageId.value
 		) {
 			console.log("[ChatStore] No decisions or tree or root message id")
 			return [] as MessageDisplay[]
 		}
 
+
 		const timingIdentifier = "[ChatStore] Displayed messages re-computed"
 		console.time(timingIdentifier)
 
 		const fullDecisions = Object.freeze(threadTreeDecisions.value)
-		const messagesLocal: MessageDisplay[] = []
 
 		const getNode = (id: string, hasNext: boolean, hasPrevious: boolean): MessageDisplay | null => {
 			const message = messages.value.get(id)
@@ -74,36 +187,31 @@ export const useChatStore = defineStore('chat', () => {
 			}
 		}
 
-		let node = rootMessageId.value
-		let displayedRootNode = getNode(node, false, false)
-		if(!displayedRootNode) return;
-		messagesLocal.push(displayedRootNode)
-
-		for (const decision of fullDecisions) {
-			const children = threadTree.value.get(node) ?? []
-			if (children.length > 0) {
-				if (!children[decision]) break;
-				node = children[decision]
-				const displayedNode = getNode(node, decision < children.length - 1, decision > 0)
-				if(!displayedNode) break;
-				messagesLocal.push(displayedNode)
-			}
+		const messagesLocal: MessageDisplay[] = []
+		for (const message of getDisplayedMessageListIds(fullDecisions, rootMessageId.value)) {
+			const displayMessage = getNode(message.id, message.hasNext, message.hasPrev)
+			if (displayMessage) messagesLocal.push(displayMessage)
 		}
+
 
 		displayedMessages.value = messagesLocal;
 		console.timeEnd(timingIdentifier)
 	})
 
+	watch([rootMessageId, threadTree], () => {
+		threadTreeDecisions.value = getDefaultThreadTreeDecisions(rootMessageId.value!, threadTreeDecisions.value)
+	}, { deep: true })
+
 	const loadThreadTree = async (conversationId: string) => {
 		return new Promise<void>((resolve, reject) => {
 			Commands.getThreadTree(conversationId)
 				.then((t) => {
-					const newMap = new Map<string, readonly string[]>()
+					threadTree.clear()
 					t.forEach((item) => {
-						newMap.set(item.key, Object.freeze(item.children))
+						threadTree.addNode(item.key, item.parent, Object.freeze(item.children))
 					})
 					rootMessageId.value = t.find((item) => item.parent === null)?.key ?? null
-					threadTree.value = newMap
+
 					console.log("[ChatStore] Thread tree loaded successfully.", { conversationId })
 					resolve()
 				})
@@ -119,8 +227,12 @@ export const useChatStore = defineStore('chat', () => {
 		threadTreeDecisions.value = getDefaultThreadTreeDecisions(rootMessageId.value, decision)
 	}
 
-	const changeThreadTreeDecision = (index: number, decision: number) => {
-		threadTreeDecisions.value[index] = decision
+	const changeThreadTreeDecision = (index: number, decision: number, relative = false) => {
+		if (!rootMessageId.value) return;
+		let decisions = [...threadTreeDecisions.value]
+		decisions[index] = relative ? threadTreeDecisions.value[index] + decision : decision
+		decisions = getDefaultThreadTreeDecisions(rootMessageId.value, decisions)
+		threadTreeDecisions.value = decisions
 	}
 
 	const loadMessages = async (conversationId: string) => {
@@ -139,21 +251,6 @@ export const useChatStore = defineStore('chat', () => {
 		})
 	}
 
-	const useDecisionToGetLastMessageId = (threadTree: Map<string, readonly string[]>, rootMessageId: string) => {
-		let node = rootMessageId
-
-		for (const decision of threadTreeDecisions.value) {
-			const children = threadTree.get(node) ?? []
-			if (children.length > 0) {
-				node = children[decision]
-			}
-			else {
-				break
-			}
-		}
-		return node
-	}
-
 	const loadConversation = async (conversationId: string) => {
 		try {
 			const identifier = '[ChatStore] Time to load conversation'
@@ -162,8 +259,7 @@ export const useChatStore = defineStore('chat', () => {
 			await loadThreadTree(conversationId)
 
 			// root message has been set in loadThreadTree
-			threadTreeDecisions.value = getDefaultThreadTreeDecisions(rootMessageId.value!)
-			lastMessageId.value = useDecisionToGetLastMessageId(threadTree.value, rootMessageId.value!)
+			threadTreeDecisions.value = getDefaultThreadTreeDecisions(rootMessageId.value!, threadTreeDecisions.value)
 			console.timeEnd(identifier)
 		}
 		catch (err) {
@@ -186,7 +282,20 @@ export const useChatStore = defineStore('chat', () => {
 		})
 	}
 
-	const addMessage = (message: Omit<Message, 'id'>, parentId?: string) => {
+	const focusMessage = (messageId: string) => {
+		if (!messages.value.has(messageId)) return
+
+		const nodeDepth = threadTree.getNodeDepth(messageId)
+		if (nodeDepth === -1) {
+			console.warn('[ChatStore] Message not found to focus in thread tree:', { messageId })
+			return
+		}
+
+		const choiceIndex = nodeDepth - 1
+		changeThreadTreeDecision(choiceIndex, threadTree.getNodeSiblingOrder(messageId))
+	}
+
+	const addMessage = (message: Omit<Message, 'id'>, parentId?: string, focus: boolean = true) => {
 		parentId = parentId ?? (lastMessageId.value ?? undefined)
 		return new Promise<string>((resolve, reject) => {
 			const conversationId = currentConversationId.value
@@ -197,11 +306,12 @@ export const useChatStore = defineStore('chat', () => {
 			Commands.addMessage(conversationId, message.text, message.sender, parentId)
 				.then(async (id) => {
 					messages.value.set(id, { ...message, id })
-					lastMessageId.value = id
-					threadTree.value.set(id, [])
+					threadTree.addNode(id, parentId)
 
-					if (parentId) threadTree.value.set(parentId, [...(threadTree.value.get(parentId!) ?? []), id])
-					threadTreeDecisions.value = getDefaultThreadTreeDecisions(rootMessageId.value!)
+					if (!parentId) rootMessageId.value = id
+
+					threadTreeDecisions.value = getDefaultThreadTreeDecisions(rootMessageId.value!, threadTreeDecisions.value)
+					if (focus) focusMessage(id)
 
 					console.log('[ChatStore] Message added successfully:', { id, parentId })
 					resolve(id)
@@ -231,7 +341,7 @@ export const useChatStore = defineStore('chat', () => {
 			Commands.updateMessage(id, text)
 				.then(() => {
 					const originalMessage = messages.value.get(id)
-					if (originalMessage) messages.value.set(id, { ...originalMessage, text })
+					if (originalMessage) messages.value.set(id, { ...originalMessage, text, timestamp: Date.now() })
 
 					console.log('[ChatStore] Message updated successfully:', { id })
 					resolve()
@@ -263,15 +373,9 @@ export const useChatStore = defineStore('chat', () => {
 				.then((newParent) => {
 					messages.value.delete(id)
 
-					threadTree.value.delete(id)
-					threadTree.value.forEach((value, key) => {
-						if (value.includes(id)) {
-							threadTree.value.set(key, value.filter((v) => v !== id))
-						}
-					})
+					threadTree.removeNode(id)
 
-					if (rootMessageId.value) threadTreeDecisions.value = getDefaultThreadTreeDecisions(rootMessageId.value)
-					lastMessageId.value = newParent
+					if (rootMessageId.value) threadTreeDecisions.value = getDefaultThreadTreeDecisions(rootMessageId.value, threadTreeDecisions.value)
 
 					console.log('[ChatStore] Message deleted successfully:', { id })
 					resolve(newParent)
@@ -291,6 +395,10 @@ export const useChatStore = defineStore('chat', () => {
 		messages,
 		threadTree,
 		userInput,
+		isStreaming,
+		sendMessage,
+		regenerateMessage,
+		deriveMessage,
 		loadMessages,
 		addMessage,
 		getMessage,

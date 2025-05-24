@@ -3,11 +3,9 @@ import { NInput, NButton } from "naive-ui";
 import MessageBubble from "./MessageBubble.vue";
 import AutoScrollWrapper from "./AutoScrollWrapper.vue";
 import { useChatStore } from "../stores/chat";
-import { onMounted, ref, inject, provide } from "vue";
-import debounce from "lodash/debounce";
+import { onMounted, ref, provide } from "vue";
 import { Message, MessageRole } from "../libs/types";
 
-import { useOpenAI } from "../composables/useOpenAI";
 import { useMermaid } from "../composables/useMermaid";
 import { useVNodeRenderer } from "../composables/useMarkdown";
 
@@ -15,63 +13,63 @@ provide("MermaidRenderer", useMermaid());
 provide("MarkdownRenderer", useVNodeRenderer());
 
 const chatStore = useChatStore();
-const { streamResponse, isStreaming } = inject("OpenAI") as ReturnType<
-  typeof useOpenAI
->;
 const autoScrollWrapper = ref();
 
 (window as any).ChatStore = chatStore
 
-async function sendMessage() {
-  if (!chatStore.userInput.trim()) return;
-
+const sendMessage = () => {
+  if (!chatStore.userInput.trim()) return
   const userMessage: Omit<Message, "id"> = {
     text: chatStore.userInput,
     sender: MessageRole.User,
     timestamp: Math.round(new Date().getTime() / 1000),
   };
-  const userMessageId = await chatStore.addMessage(userMessage);
-  chatStore.clearUserInput();
-
-  const botMessage: Omit<Message, "id"> = {
-    text: "Generating...",
-    sender: MessageRole.Assistant,
-    timestamp: Math.round(new Date().getTime() / 1000),
-  };
-
-  const botMessageId = await chatStore.addMessage(botMessage, userMessageId);
-
-  const updateMessage = (text: string) => {
-    const message = chatStore.messages.get(botMessageId);
-    if (message) chatStore.messages.set(botMessageId, { ...message, text });
-  };
-  const updateBubbleText = debounce(updateMessage, 10);
-  autoScrollWrapper.value?.scrollToBottom(false);
-
-  let responseText = "";
-  await streamResponse(
-    chatStore.displayedMessage.map((msg) => ({
-      role: msg.sender === "user" ? "user" : "assistant",
-      content: msg.text,
-    })),
-    (chunk) => {
-      responseText += chunk;
-      updateBubbleText(responseText);
+  chatStore.sendMessage(userMessage, {
+    beforeSend: () => {
+      chatStore.clearUserInput();
+      autoScrollWrapper.value?.scrollToBottom(false);
+    },
+    onReceiving: () => {
       autoScrollWrapper.value?.scrollToBottom();
-    },
-    () => {
-      chatStore.updateMessage(botMessageId, responseText);
-    },
-    true,
-  );
+    }
+  })
 }
 
-const navigateToSibling = (index: number, direction: number) => {
-  if (index < 0 || index >= chatStore.displayedMessage.length) return;
+const regenerateMessage = (messageId: string, insertGuidance = false) => {
+  chatStore.regenerateMessage(messageId, {
+    beforeSend: () => {
+      chatStore.clearUserInput();
+      autoScrollWrapper.value?.scrollToBottom(false);
+    },
+    onReceiving: () => {
+      autoScrollWrapper.value?.scrollToBottom();
+    }
+  }, insertGuidance);
+}
 
-  chatStore.threadTreeDecisions[index] += direction;
+const resendMessage = (messageId: string, text: string, derive: boolean) => {
+  if (derive) {
+    chatStore.deriveMessage(messageId, text, {
+      beforeSend: () => {
+        chatStore.clearUserInput();
+        autoScrollWrapper.value?.scrollToBottom(false);
+      },
+      onReceiving: () => {
+        autoScrollWrapper.value?.scrollToBottom();
+      }
+    });
+  } else {
+    (async () => {
+      await chatStore.updateMessage(messageId, text)
+      regenerateMessage(messageId)
+    })();
+  }
+}
+
+const navigateToSibling = (id: string, direction: number) => {
+  const index = chatStore.threadTree.getNodeDepth(id) - 1;
+  chatStore.changeThreadTreeDecision(index, direction, true);
 };
-
 onMounted(async () => {
   try {
     const conversations = await chatStore.listConversations();
@@ -101,32 +99,20 @@ onMounted(async () => {
     <div class="messages-container">
       <AutoScrollWrapper ref="autoScrollWrapper" :auto="true" :smooth="true">
         <div class="bubble-container">
-          <MessageBubble
-            v-for="(message, index) in chatStore.displayedMessage"
-            :key="message.id"
-            :text="message.text"
-            :sender="message.sender"
-            :timestamp="new Date(message.timestamp * 1000)"
-            :id="message.id"
-            :over="index === chatStore.displayedMessage.length - 1 || !isStreaming"
-            :hasPrevious="message.hasPrevious"
-            :hasNext="message.hasNext"
-            @previous="() => navigateToSibling(index, -1)"
-            @next="() => navigateToSibling(index, 1)"
-          />
+          <MessageBubble v-for="(message, index) in chatStore.displayedMessage" :key="message.id" :text="message.text"
+            :sender="message.sender" :timestamp="new Date(message.timestamp * 1000)" :id="message.id"
+            :over="index === chatStore.displayedMessage.length - 1 && !chatStore.isStreaming"
+            :hasPrevious="message.hasPrevious" :hasNext="message.hasNext"
+            @previous="() => navigateToSibling(message.id, -1)" @next="() => navigateToSibling(message.id, 1)"
+            @resend="(derive, text) => resendMessage(message.id, text, derive)"
+            @regenerate="() => regenerateMessage(message.id, true)" />
         </div>
       </AutoScrollWrapper>
     </div>
 
     <div class="input-container">
-      <n-input
-        v-model:value="chatStore.userInput"
-        placeholder="Type your message..."
-        @keyup.enter="sendMessage"
-        clearable
-        round
-        type="textarea"
-      />
+      <n-input v-model:value="chatStore.userInput" placeholder="Type your message..." @keyup.enter="sendMessage"
+        clearable round type="textarea" />
       <n-button type="primary" @click="sendMessage" round>Send</n-button>
     </div>
   </div>

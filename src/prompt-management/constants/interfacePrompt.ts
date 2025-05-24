@@ -15,5 +15,15 @@ graph TD;
     C-->D;
 \`\`\`
 
-The diagram above will render as a live preview.
+The diagram above will render as a live preview in the interface.
+`.trim();
+
+
+// insert into the messages when the user wants to regenerate the response.
+export const INTERFACE_REGENERATE_INSERT = `
+User clicks the button for regeneration.
+
+Please provide a more detailed, accurate, or improved version of your previous response.
+Consider any additional context, clarify any ambiguities, and ensure the information is comprehensive and well-structured.
+**IF APPLICABLE**, include examples, diagrams, or formatted content to enhance understanding.
 `.trim();
