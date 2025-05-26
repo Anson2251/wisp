@@ -25,6 +25,8 @@ const backgroundColor = computed(() =>
     : theme.value.cardColor
 )
 
+const border = computed(() => `1px solid ${borderColor.value}`)
+
 const props = defineProps<{
   text: string
   sender: MessageRole
@@ -71,83 +73,76 @@ const editMessage = () => {
 </script>
 
 <template>
-  <n-flex align="start" :wrap="false" :style="{
-    flexDirection: sender === 'user' ? 'row-reverse' : 'row',
-    alignItems: 'flex-start',
-    marginBottom: '12px'
-  }">
-    <n-avatar style="position: sticky; top: 0;">
-      <n-icon :component="sender === 'bot' ? Chat24Regular : Person24Regular" />
-    </n-avatar>
-    <div class="message-bubble" :class="sender" :id="id" :style="{
-      'background-color': backgroundColor,
-      'border-radius': theme.borderRadius,
-      'box-shadow': theme.boxShadow2,
-      'border': `1px solid ${borderColor}`,
+  <div style="width: 100%; height: fit-content;">
+    <n-flex align="start" :wrap="false" :style="{
+      flexDirection: sender === 'user' ? 'row-reverse' : 'row',
+      alignItems: 'flex-start',
+      marginBottom: '12px'
     }">
-      <div class="content">
-        <MarkdownRenderer :text="text" :over="over" />
-      </div>
-      <div class="footer" :style="{
-        justifyContent: sender === 'user' ? 'flex-end' : 'flex-start',
-      }">
-        <div class="footer-content">
+      <n-avatar style="position: sticky; top: 0;">
+        <n-icon :component="sender === 'bot' ? Chat24Regular : Person24Regular" />
+      </n-avatar>
+      <div class="message-bubble" :class="sender" :id="id">
+        <div class="content-container">
+          <div class="content">
+            <MarkdownRenderer :text="text" :over="over" />
+          </div>
+        </div>
+        <div class="footer">
           <n-flex :wrap="false" align="center">
             <n-button-group class="button-group">
               <n-button quaternary :onclick="copyMessage" size="tiny">
                 <template #icon>
-                  <n-icon :component="Copy16Regular" :size="16"/>
+                  <n-icon :component="Copy16Regular" :size="16" />
                 </template>
               </n-button>
               <n-button quaternary :onclick="removeMessage" type="error" size="tiny">
                 <template #icon>
-                  <n-icon :component="Delete16Regular" :size="18"/>
+                  <n-icon :component="Delete16Regular" :size="18" />
                 </template>
               </n-button>
               <n-button quaternary @click="emit('regenerate')" size="tiny" v-if="sender === 'bot'">
                 <template #icon>
-                  <n-icon :component="ArrowClockwise16Regular" :size="16"/>
+                  <n-icon :component="ArrowClockwise16Regular" :size="16" />
                 </template>
               </n-button>
               <n-button quaternary :onclick="editMessage" size="tiny">
                 <template #icon>
-                  <n-icon :component="Edit16Regular" :size="16"/>
+                  <n-icon :component="Edit16Regular" :size="16" />
                 </template>
               </n-button>
             </n-button-group>
             <n-button-group class="nav-group" v-if="hasPrevious || hasNext">
               <n-button quaternary @click="emit('previous')" size="tiny" :disabled="!hasPrevious">
                 <template #icon>
-                  <n-icon :component="ChevronLeft16Regular" :size="16"/>
+                  <n-icon :component="ChevronLeft16Regular" :size="16" />
                 </template>
               </n-button>
               <n-button quaternary @click="emit('next')" size="tiny" :disabled="!hasNext">
                 <template #icon>
-                  <n-icon :component="ChevronRight16Regular" :size="16"/>
+                  <n-icon :component="ChevronRight16Regular" :size="16" />
                 </template>
               </n-button>
             </n-button-group>
           </n-flex>
-          <span class="timestamp" :style="{
-            color: theme.textColorBase,
-          }">{{ timestamp.toLocaleTimeString() }}</span>
+          <span class="timestamp">{{ timestamp.toLocaleTimeString() }}</span>
         </div>
       </div>
-    </div>
-  </n-flex>
-  <MessageBubbleEditor v-model:show="showEditorModal" :id="id" @resend="(derive, text) => emit('resend', derive, text)"/>
+    </n-flex>
+    <MessageBubbleEditor v-model:show="showEditorModal" :id="id"
+      @resend="(derive, text) => emit('resend', derive, text)" />
+  </div>
 </template>
 
 <style scoped>
 .message-bubble {
   max-width: 80%;
   width: fit-content;
-  padding: 12px 16px;
-  margin-left: 12px;
-  margin-right: 12px;
-  transition: all 0.2s ease;
-  position: relative;
   margin-bottom: 16px;
+
+  display: grid;
+  grid-template-columns: auto;
+  grid-template-rows: auto, auto;
 
   --footer-buttons-opacity: 0;
 }
@@ -158,12 +153,10 @@ const editMessage = () => {
 
 .message-bubble.user {
   color: white;
-  /* background: linear-gradient(135deg, var(--to), var(--from)); */
   margin-left: auto;
 }
 
 .message-bubble.bot {
-  /* background: linear-gradient(135deg, var(--to), var(--from)); */
   margin-right: auto;
 }
 
@@ -189,44 +182,47 @@ const editMessage = () => {
   }
 }
 
+.content-container {
+  grid-area: 1 / 1 / 2 / 2;
+  display: flex;
+  justify-content: v-bind('sender === "bot" ? "flex-start" : "flex-end"');
+}
+
 .content {
+  width: fit-content;
+  padding: 12px 16px;
+  margin-left: 12px;
+  margin-right: 12px;
+  transition: all 0.2s ease;
+
+  background-color: v-bind('backgroundColor');
+  border-radius: v-bind('theme.borderRadius');
+  box-shadow: v-bind('theme.boxShadow2');
+  border: v-bind('border');
+
   overflow: auto;
 }
 
 .footer {
-  position: absolute;
-  bottom: -30px;
-  left: 2px;
-  padding-top: 8px;
-
-  display: flex;
-  align-items: center;
-  overflow: visible;
-  margin-top: 8px;
+  padding: 8px 16px 0 16px;
   width: 100%;
-  opacity: var(--footer-buttons-opacity);
-  transition: opacity .1s ease-in;
-}
-
-.footer-content {
-  width: 100%;
+  box-sizing: border-box;
   min-width: fit-content;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-}
-
-.nav-group {
-  margin-left: 8px;
+  opacity: var(--footer-buttons-opacity);
+  transition: opacity .2s v-bind('theme.cubicBezierEaseInOut');
 }
 
 .timestamp {
   font-size: 0.8em;
   margin-left: 16px;
-  margin-right: 8px;
 
   width: fit-content;
   font-family: monospace;
+  /* opacity: var(--footer-buttons-opacity); */
+  color: v-bind('theme.textColorBase')
 }
 </style>

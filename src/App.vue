@@ -69,7 +69,7 @@ const osThemeRef = useOsTheme()
 const isDark = computed(() => osThemeRef.value === "dark")
 const theme = computed(() =>
   (isDark.value)
-    ? darkTheme 
+    ? darkTheme
     : lightTheme
 );
 
@@ -85,7 +85,7 @@ const themeOverrides = computed(() => ({
     <n-dialog-provider>
       <n-modal-provider>
         <n-message-provider>
-          <Chat />
+          <Chat :use-virtual-scroll="true"/>
         </n-message-provider>
       </n-modal-provider>
     </n-dialog-provider>
