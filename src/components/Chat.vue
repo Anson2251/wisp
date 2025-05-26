@@ -3,7 +3,7 @@ import { NInput, NButton } from "naive-ui";
 import MessageBubble from "./MessageBubble.vue";
 import AutoScrollWrapper from "./AutoScrollWrapper.vue";
 import { useChatStore } from "../stores/chat";
-import { onMounted, ref, provide, computed } from "vue";
+import { onMounted, ref, provide, watch, computed } from "vue";
 import { Message, MessageRole } from "../libs/types";
 import { VirtList } from 'vue-virt-list';
 
@@ -25,10 +25,17 @@ const props = defineProps({
   }
 })
 
+const scrollToBottom = (withThrottle = false, smooth = false) => {
+  if (props.useVirtualScroll && virtualList.value) {
+    virtualList.value.scrollToIndex(chatStore.displayedMessage.length - 1);
+  }
+  if (!props.useVirtualScroll && autoScrollWrapper.value) {
+    autoScrollWrapper.value.scrollToBottom(withThrottle, smooth);
+  }
+}
 
-const scrollToBottom = computed(() => (withThrottle = false, smooth = false) => {
-  const wrapper = (props.useVirtualScroll ? virtualList.value : autoScrollWrapper.value)
-  if (wrapper) wrapper.scrollToBottom(withThrottle, smooth)
+watch(() => chatStore.threadTreeDecisions, () => {
+  setTimeout(() => scrollToBottom(true, true), 200);
 });
 
 (window as any).ChatStore = chatStore
@@ -43,10 +50,10 @@ const sendMessage = () => {
   chatStore.sendMessage(userMessage, {
     beforeSend: () => {
       chatStore.clearUserInput();
-      scrollToBottom.value(false);
+      scrollToBottom(false);
     },
     onReceiving: () => {
-      scrollToBottom.value();
+      scrollToBottom();
     }
   })
 }
@@ -55,10 +62,10 @@ const regenerateMessage = (messageId: string, insertGuidance = false) => {
   chatStore.regenerateMessage(messageId, {
     beforeSend: () => {
       chatStore.clearUserInput();
-      scrollToBottom.value(false);
+      scrollToBottom(false);
     },
     onReceiving: () => {
-      scrollToBottom.value();
+      scrollToBottom();
     }
   }, insertGuidance);
 }
@@ -68,10 +75,10 @@ const resendMessage = (messageId: string, text: string, derive: boolean) => {
     chatStore.deriveMessage(messageId, text, {
       beforeSend: () => {
         chatStore.clearUserInput();
-        scrollToBottom.value(false);
+        scrollToBottom(false);
       },
       onReceiving: () => {
-        scrollToBottom.value();
+        scrollToBottom();
       }
     });
   } else {
@@ -102,9 +109,18 @@ onMounted(async () => {
     chatStore.currentConversationId = conversationId;
     console.log("[Chat] Current conversation id: ", conversationId);
 
-    chatStore.loadConversation(conversationId).then(() => {
-      setTimeout(() => scrollToBottom.value(false, false), 100);
-    });
+    await chatStore.loadConversation(conversationId)
+
+    if (props.useVirtualScroll) {
+      const localDisplayedMessage = computed(() => chatStore.displayedMessage);
+      const localThreadTree = computed(() => chatStore.threadTree);
+      const localThreadTreeDecisions = computed(() => chatStore.threadTreeDecisions);
+      watch([localDisplayedMessage, localThreadTreeDecisions, localThreadTree], () => {
+        if (!virtualList.value) return;
+        console.log("[Chat] Updating virtual list with new messages");
+        virtualList.value.forceUpdate() // extra space below the last item would be created
+      }, {deep: true});
+    }
   } catch (error) {
     console.error("[Chat] Error loading messages:", error);
   }

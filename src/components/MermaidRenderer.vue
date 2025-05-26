@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { watch, ref, computed, inject } from "vue"
-import { type RenderOptions } from "mermaid-isomorphic"
 import { useMermaid } from "../composables/useMermaid"
-import { NCode, NImage, useThemeVars, GlobalThemeOverrides } from "naive-ui";
+import { NCode, NImage, useThemeVars, GlobalThemeOverrides, useOsTheme } from "naive-ui";
 import { encodeBase64 } from "../utils/common";
+import { MermaidConfig } from "mermaid";
 
 const props = defineProps<{
   diagram: string,
-  options?: RenderOptions,
+  options?: MermaidConfig,
 }>()
 
 const { renderDiagram } = inject('MermaidRenderer') as ReturnType<typeof useMermaid>
@@ -45,10 +45,15 @@ const theme = useThemeVars()
 const height = ref<number>(0)
 const width = ref<number>(0)
 
+const osThemeRef = useOsTheme()
+
 const updateDiagram = () => {
   diagramSvg.value = ""
 
-  renderDiagram(props.diagram, props.options)
+  renderDiagram(props.diagram, {
+    ...props.options,
+    theme: osThemeRef.value === "light" ? "light" : "dark",
+  }, theme.value.modalColor)
     .then((result) => {
       if (result) {
         diagramSvg.value = result.svg
@@ -66,6 +71,8 @@ const updateDiagram = () => {
     })
 }
 
+watch(osThemeRef, updateDiagram, { immediate: true })
+
 watch(() => props.diagram, updateDiagram, { immediate: true })
 </script>
 
@@ -81,7 +88,7 @@ watch(() => props.diagram, updateDiagram, { immediate: true })
       Rendering diagram...
     </div>
     <div v-else-if="diagramSvg && height > 0 && width > 0" class="diagram">
-      <n-image :src="diagramSrc ?? ''" :width="width" :height="height" :theme-overrides="imageGroupThemeOverrides"/>
+      <n-image :src="diagramSrc ?? ''" :width="width" :height="height" :theme-overrides="imageGroupThemeOverrides" />
     </div>
     <div v-else class="empty">
       No diagram to render
@@ -92,13 +99,14 @@ watch(() => props.diagram, updateDiagram, { immediate: true })
 <style scoped>
 .mermaid-renderer {
   width: 100%;
+  margin: 12px 0;
   height: fit-content;
   overflow: auto;
 
-  border: 1px solid #e0e0e0;
+  border: 1px solid v-bind('theme.borderColor');
   box-sizing: border-box;
   /* I don't know why I cannot get the mermaid rendered into dark theme */
-  background-color: white;
+  background-color: v-bind('theme.modalColor');
 }
 
 .error {

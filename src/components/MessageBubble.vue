@@ -73,7 +73,7 @@ const editMessage = () => {
 </script>
 
 <template>
-  <div style="width: 100%; height: fit-content;">
+  <div class="item-container">
     <n-flex align="start" :wrap="false" :style="{
       flexDirection: sender === 'user' ? 'row-reverse' : 'row',
       alignItems: 'flex-start',
@@ -135,6 +135,24 @@ const editMessage = () => {
 </template>
 
 <style scoped>
+@keyframes fade-in {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.item-container {
+  transform-origin: bottom 30%;
+  width: 100%;
+  height: fit-content;
+  animation: fade-in 0.2s v-bind('theme.cubicBezierEaseIn');
+}
+
 .message-bubble {
   max-width: 80%;
   width: fit-content;
@@ -212,6 +230,10 @@ const editMessage = () => {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+}
+
+/** I don't know why the timestamp doesn't disappear in Safari once it appears */
+.footer:deep(*) { /* Work around for Safari bug */
   opacity: var(--footer-buttons-opacity);
   transition: opacity .2s v-bind('theme.cubicBezierEaseInOut');
 }

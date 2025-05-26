@@ -36,7 +36,7 @@ export const useChatStore = defineStore('chat', () => {
 		const userMessageId = await addMessage(message, parentMessageId, true);
 
 		const botMessage: Omit<Message, "id"> = {
-			text: "Generating...",
+			text: "",
 			sender: MessageRole.Assistant,
 			timestamp: Math.round(new Date().getTime() / 1000),
 		};
@@ -72,7 +72,7 @@ export const useChatStore = defineStore('chat', () => {
 		if (!parentId) return Promise.reject("Cannot regenerate the root message");
 
 		const botMessage: Omit<Message, "id"> = {
-			text: "Generating...",
+			text: "",
 			sender: MessageRole.Assistant,
 			timestamp: Math.round(new Date().getTime() / 1000),
 		};

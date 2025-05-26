@@ -1,26 +1,75 @@
-import { createMermaidRenderer, type RenderOptions } from "mermaid-isomorphic"
+// import { createMermaidRenderer, type RenderOptions } from "mermaid-isomorphic"
 import { ref, computed } from "vue"
 import { hashContent, getCachedDiagram, putCachedDiagram, clearDiagramCache } from "../libs/commands"
 
+import mermaid, { type MermaidConfig } from "mermaid";
 
-function addWhiteBackgroundToSvg(svgString: string): string {
-    const parser = new DOMParser();
-    const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
-    const svgElement = svgDoc.querySelector('svg');
+/**
+ * Renders Mermaid diagram code and extracts size and SVG.
+ * Uses getBBox() as a fallback if attributes/viewBox are missing.
+ * @param diagramCode - Mermaid diagram code string
+ */
+export async function renderMermaidWithSize(diagramCode: string, config: MermaidConfig): Promise<DiagramCacheEntry | null> {
+	try {
+		mermaid.initialize({ ...config, startOnLoad: false });
 
-    if (!svgElement) {
-        throw new Error('Invalid SVG: Could not find <svg> element');
-    }
+		const { svg } = await mermaid.render("temp-id", diagramCode);
 
-    svgElement.setAttribute('style', 'background-color: white;')
-	svgElement.setAttribute('viewport-fill', 'white')
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(svg, "image/svg+xml");
+		const svgEl = doc.documentElement;
 
-    const serializer = new XMLSerializer();
-    return serializer.serializeToString(svgDoc);
+		if (!svgEl) return null;
+
+		let width = parseFloat(svgEl.getAttribute("width") || "0");
+		let height = parseFloat(svgEl.getAttribute("height") || "0");
+
+		// Try getBBox as a fallback if width/height are not found
+		if ((!width || !height) && svgEl.hasAttribute("viewBox")) {
+			const tempContainer = document.createElement("div");
+			tempContainer.style.cssText = "position:absolute;visibility:hidden;";
+			document.body.appendChild(tempContainer);
+
+			const tempSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+			tempSvg.innerHTML = svgEl.innerHTML;
+			tempContainer.appendChild(tempSvg);
+
+			try {
+				const bbox = tempSvg.getBBox();
+				width = bbox.width;
+				height = bbox.height;
+			} catch (e) {
+				console.warn("getBBox() failed:", e);
+			}
+
+			// Clean up
+			document.body.removeChild(tempContainer);
+		}
+
+		return { width, height, svg };
+	}
+	catch (e) {
+		console.error('Error parsing SVG:', e);
+		return null;
+	}
 }
 
+function addBackgroundToSvg(svgString: string, colour: string): string {
+	const parser = new DOMParser();
+	const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
+	const svgElement = svgDoc.querySelector('svg');
 
-const renderer = createMermaidRenderer()
+	if (!svgElement) {
+		throw new Error('Invalid SVG: Could not find <svg> element');
+	}
+
+	svgElement.setAttribute('style', `background-color: ${colour};`)
+	svgElement.setAttribute('viewport-fill', colour)
+
+	const serializer = new XMLSerializer();
+	return serializer.serializeToString(svgDoc);
+}
+
 const memoryCache = ref(new Map<string, DiagramCacheEntry>())
 const CACHE_SIZE_LIMIT = 20
 const CACHE_PRUNE_COEFFICIENT = 0.6
@@ -34,56 +83,66 @@ function pruneMemoryCache() {
 	}
 }
 
+const getDiagram = async (diagram: string, options: MermaidConfig) => {
+	const result = await renderMermaidWithSize(diagram, options)
+	if (!result) return Promise.reject("Returned result is null or undefined")
+
+	return {
+		svg: result.svg,
+		height: Math.round(result.height),
+		width: Math.round(result.width)
+	}
+}
+
+const renderWithCache = async (diagram: string, cacheKey: string, options: MermaidConfig) => {
+	// Check memory cache first
+	if (memoryCache.value.has(cacheKey)) {
+		console.info("[useMermaid] Memory cache hit for diagram", { cacheKey })
+		return memoryCache.value.get(cacheKey)!
+	}
+
+	// Check SQLite cache
+	const cached = await getCachedDiagram(cacheKey)
+	if (cached) {
+		console.info("[useMermaid] SQLite cache hit for diagram", { cacheKey })
+		memoryCache.value.set(cacheKey, cached)
+		return cached
+	}
+
+	const entry = await getDiagram(diagram, options)
+
+	// Update both caches
+	pruneMemoryCache()
+	memoryCache.value.set(cacheKey, entry)
+	putCachedDiagram(cacheKey, entry)
+		.then(() => console.info("[useMermaid] Diagram cached in SQLite successfully", { cacheKey }))
+	console.info("[useMermaid] Cache miss, rendered diagram", { cacheKey })
+	return entry
+}
+
 export function useMermaid() {
-	const renderDiagram = async (diagram: string, options?: RenderOptions): Promise<DiagramCacheEntry | null> => {
-		const cacheKey = await hashContent(JSON.stringify({ diagram, options }))
-		const render = async () => {
-
-			// Check memory cache first
-			if (memoryCache.value.has(cacheKey)) {
-				console.info("[useMermaid] Memory cache hit for diagram", { cacheKey })
-				return memoryCache.value.get(cacheKey)!
-			}
-
-			// Check SQLite cache
-			const cached = await getCachedDiagram(cacheKey)
-			if (cached) {
-				console.info("[useMermaid] SQLite cache hit for diagram", { cacheKey })
-				memoryCache.value.set(cacheKey, cached)
-				return cached
-			}
-
-			const results = await renderer([diagram], options || {})
-			if (results.length > 0) {
-				const result = results[0]
-				if (!result) return Promise.reject("Returned result is null or undefined")
-				if (result.status === "rejected") return Promise.reject(result.reason)
-
-				const height = Math.round(result.value.height)
-				const width = Math.round(result.value.width)
-
-				const entry = {
-					svg: addWhiteBackgroundToSvg(result.value.svg),
-					height,
-					width
-				}
-
-				// Update both caches
-				pruneMemoryCache()
-				memoryCache.value.set(cacheKey, entry)
-				putCachedDiagram(cacheKey, entry)
-					.then(() => console.info("[useMermaid] Diagram cached in SQLite successfully", { cacheKey }))
-				console.info("[useMermaid] Cache miss, rendered diagram", { cacheKey })
-				return entry
-			}
-			return null
+	const renderDiagram = async (diagram: string, options?: Omit<MermaidConfig, 'theme'> & { theme: 'light' | 'dark' }, bgColour = 'white', allowCache = true): Promise<DiagramCacheEntry | null> => {
+		const mermaidOptions: MermaidConfig = {
+			...options,
+			theme: options?.theme === 'dark' ? 'dark' : 'default',
 		}
 
-		const identifier = `[useMermaid] Render diagram (${cacheKey})`
-		console.time(identifier)
-		const result = await render()
-		console.timeEnd(identifier)
-		return result
+		if (allowCache) {
+			const cacheKey = await hashContent(JSON.stringify({ diagram, mermaidOptions }))
+
+			const identifier = `[useMermaid] Render diagram (${cacheKey})`
+			console.time(identifier)
+			const result = await renderWithCache(diagram, cacheKey, mermaidOptions)
+			result.svg = addBackgroundToSvg(result.svg, bgColour)
+			console.timeEnd(identifier)
+			return result
+		}
+		else {
+			console.info('[useMermaid] Caching is disabled, rendering diagram without cache')
+			const result = await getDiagram(diagram, mermaidOptions)
+			result.svg = addBackgroundToSvg(result.svg, bgColour)
+			return result
+		}
 	}
 
 	const clearCache = async () => {
