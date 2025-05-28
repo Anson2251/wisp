@@ -56,7 +56,7 @@ export function useVNodeRenderer() {
 	})
 
 
-	return async (text: string, enableLastMermaid: boolean = false) => {
+	return async (text: string, enableLastMermaid: boolean = false, mermaidCallback?: (success: boolean) => void, parseCallback?: (containMermaid: boolean) => void) => {
 		try {
 			const tree = processor.parse(text)
 
@@ -76,19 +76,39 @@ export function useVNodeRenderer() {
 				}
 			}
 
+			const containMermaidLive = (node: Root) => {
+				if (!node) return false
+				if (!node.children) return false;
+				for (const child of node.children) {
+					if (child.type === 'code') {
+						if (child.lang === 'mermaid-live') {
+							return true
+						}
+					}
+					else {
+						if (containMermaidLive(child as unknown as Root)) {
+							return true
+						}
+					}
+				}
+				return false
+			}
+
+			if (parseCallback) parseCallback(containMermaidLive(tree))
+
 			if (!enableLastMermaid) disableLastMermaidRc(tree)
 			const vNode = toVNode(tree, {
 				components: {
 					inlineMath: getInlineMathComponent,
 					math: getMathComponent,
-					code: (node: Code) => h(CodeMermaidRenderer, { code: node.value ?? "", language: node.lang ?? "" }),
+					code: (node: Code) => h(CodeMermaidRenderer, { code: node.value ?? "", language: node.lang ?? "", onReady: mermaidCallback }),
 					inlineCode: (node: InlineCode) => h(NCode, { code: node.value ?? "", inline: true, wordWrap: true, style: { transition: 'none !important' } }),
 					html: (node: Html) => h('div', { innerHTML: sanitize(node.value) }),
 
 					heading: (node: Heading) => {
 						const depth = node.depth
 						const headings = [NH1, NH2, NH3, NH4, NH5, NH6]
-						return h(headings[depth - 1], {alignText: true})
+						return h(headings[depth - 1], { alignText: true })
 					},
 					link: NA,
 					blockquote: NBlockquote,
@@ -97,7 +117,7 @@ export function useVNodeRenderer() {
 					paragraph: NText,
 					strong: h(NText, { strong: true }),
 					emphasis: h(NText, { italic: true }),
-					table: h(NTable, {bordered: true, singleLine: false}),
+					table: h(NTable, { bordered: true, singleLine: false }),
 					thematicBreak: NDivider,
 				}
 			})

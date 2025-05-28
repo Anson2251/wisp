@@ -3,9 +3,8 @@ import { NInput, NButton } from "naive-ui";
 import MessageBubble from "./MessageBubble.vue";
 import AutoScrollWrapper from "./AutoScrollWrapper.vue";
 import { useChatStore } from "../stores/chat";
-import { onMounted, ref, provide, watch, computed } from "vue";
+import { onMounted, ref, provide, watch } from "vue";
 import { Message, MessageRole } from "../libs/types";
-import { VirtList } from 'vue-virt-list';
 
 import { useMermaid } from "../composables/useMermaid";
 import { useVNodeRenderer } from "../composables/useMarkdown";
@@ -16,29 +15,17 @@ provide("MarkdownRenderer", useVNodeRenderer());
 const chatStore = useChatStore();
 
 const autoScrollWrapper = ref<typeof AutoScrollWrapper | null>(null);
-const virtualList = ref<typeof VirtList | null>(null)
 
 const props = defineProps({
-  useVirtualScroll: {
+  useBubbleCulling: {
     type: Boolean,
     default: false
   }
 })
 
-const scrollToBottom = (withThrottle = false, smooth = false) => {
-  if (props.useVirtualScroll && virtualList.value) {
-    virtualList.value.scrollToIndex(chatStore.displayedMessage.length - 1);
-  }
-  if (!props.useVirtualScroll && autoScrollWrapper.value) {
-    autoScrollWrapper.value.scrollToBottom(withThrottle, smooth);
-  }
-}
-
 watch(() => chatStore.threadTreeDecisions, () => {
-  setTimeout(() => scrollToBottom(true, true), 200);
+  setTimeout(() => autoScrollWrapper.value?.scrollToBottom(true, true), 200);
 });
-
-(window as any).ChatStore = chatStore
 
 const sendMessage = () => {
   if (!chatStore.userInput.trim()) return
@@ -50,10 +37,10 @@ const sendMessage = () => {
   chatStore.sendMessage(userMessage, {
     beforeSend: () => {
       chatStore.clearUserInput();
-      scrollToBottom(false);
+      autoScrollWrapper.value?.scrollToBottom(false);
     },
     onReceiving: () => {
-      scrollToBottom();
+      autoScrollWrapper.value?.scrollToBottom();
     }
   })
 }
@@ -62,10 +49,10 @@ const regenerateMessage = (messageId: string, insertGuidance = false) => {
   chatStore.regenerateMessage(messageId, {
     beforeSend: () => {
       chatStore.clearUserInput();
-      scrollToBottom(false);
+      autoScrollWrapper.value?.scrollToBottom(false);
     },
     onReceiving: () => {
-      scrollToBottom();
+      autoScrollWrapper.value?.scrollToBottom();
     }
   }, insertGuidance);
 }
@@ -75,10 +62,10 @@ const resendMessage = (messageId: string, text: string, derive: boolean) => {
     chatStore.deriveMessage(messageId, text, {
       beforeSend: () => {
         chatStore.clearUserInput();
-        scrollToBottom(false);
+        autoScrollWrapper.value?.scrollToBottom(false);
       },
       onReceiving: () => {
-        scrollToBottom();
+        autoScrollWrapper.value?.scrollToBottom();
       }
     });
   } else {
@@ -93,8 +80,9 @@ const navigateToSibling = (id: string, direction: number) => {
   const index = chatStore.threadTree.getNodeDepth(id) - 1;
   chatStore.changeThreadTreeDecision(index, direction, true);
 };
+
 onMounted(async () => {
-  console.log(`[Chat] Currently using ${props.useVirtualScroll ? "virtual scroll" : "normal scroll"} as scroll wrapper`);
+  if (props.useBubbleCulling) console.log(`[Chat] Message bubble culling enabled`)
   try {
     const conversations = await chatStore.listConversations();
     let conversationId = "";
@@ -110,17 +98,9 @@ onMounted(async () => {
     console.log("[Chat] Current conversation id: ", conversationId);
 
     await chatStore.loadConversation(conversationId)
-
-    if (props.useVirtualScroll) {
-      const localDisplayedMessage = computed(() => chatStore.displayedMessage);
-      const localThreadTree = computed(() => chatStore.threadTree);
-      const localThreadTreeDecisions = computed(() => chatStore.threadTreeDecisions);
-      watch([localDisplayedMessage, localThreadTreeDecisions, localThreadTree], () => {
-        if (!virtualList.value) return;
-        console.log("[Chat] Updating virtual list with new messages");
-        virtualList.value.forceUpdate() // extra space below the last item would be created
-      }, {deep: true});
-    }
+    setTimeout(() => {
+      autoScrollWrapper.value?.scrollToBottom();
+    }, 500);
   } catch (error) {
     console.error("[Chat] Error loading messages:", error);
   }
@@ -131,7 +111,6 @@ onMounted(async () => {
   <div class="chat-container">
     <div class="messages-container">
       <AutoScrollWrapper
-        v-if="!useVirtualScroll"
         ref="autoScrollWrapper"
         :auto="true"
         :smooth="true">
@@ -146,32 +125,13 @@ onMounted(async () => {
             :over="index === chatStore.displayedMessage.length - 1 && !chatStore.isStreaming"
             :hasPrevious="message.hasPrevious"
             :hasNext="message.hasNext"
+            :culling="useBubbleCulling"
             @previous="() => navigateToSibling(message.id, -1)"
             @next="() => navigateToSibling(message.id, 1)"
             @resend="(derive, text) => resendMessage(message.id, text, derive)"
             @regenerate="() => regenerateMessage(message.id, true)" />
         </div>
       </AutoScrollWrapper>
-      <VirtList
-        v-if="useVirtualScroll"
-        ref="virtualList"
-        :buffer="1"
-        :bufferTop="2"
-        :bufferBottom="2"
-        :list="chatStore.displayedMessage"
-        itemKey="id"
-        :minSize="16"
-      >
-        <template #default="{ itemData: message, index }">
-          <message-bubble :key="message.id" :text="message.text" :sender="message.sender"
-              :timestamp="new Date(message.timestamp * 1000)" :id="message.id"
-              :over="index === chatStore.displayedMessage.length - 1 && !chatStore.isStreaming"
-              :hasPrevious="message.hasPrevious" :hasNext="message.hasNext"
-              @previous="() => navigateToSibling(message.id, -1)" @next="() => navigateToSibling(message.id, 1)"
-              @resend="(derive, text) => resendMessage(message.id, text, derive)"
-              @regenerate="() => regenerateMessage(message.id, true)" />
-        </template>
-      </VirtList>
     </div>
 
     <div class="input-container">

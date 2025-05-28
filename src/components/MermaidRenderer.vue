@@ -32,15 +32,19 @@ const diagramSrc = computed(() => {
 
       return `data:image/svg+xml;base64,${encodeBase64(diagramSvg.value)}`;
     }
-    return null;
+    return "";
   }
   catch (e) {
     console.error(e)
     error.value = "Failed to convert diagram to base64: " + e
-    return null
+    return ""
   }
 })
 const theme = useThemeVars()
+
+const emits = defineEmits<{
+  (e: 'ready', success: boolean): void
+}>()
 
 const height = ref<number>(0)
 const width = ref<number>(0)
@@ -61,13 +65,15 @@ const updateDiagram = () => {
         width.value = result.width
       } else {
         diagramSvg.value = ""
+        error.value = "No diagram rendered"
         height.value = 0
         width.value = 0
       }
+      emits('ready', true)
     })
     .catch((err) => {
-      error.value = err.message
-      console.error(err)
+      error.value = err
+      emits('ready', false)
     })
 }
 
@@ -77,18 +83,18 @@ watch(() => props.diagram, updateDiagram, { immediate: true })
 </script>
 
 <template>
-  <div class="mermaid-renderer" :style="{
-    borderRadius: theme.borderRadius,
-  }">
+  <div class="mermaid-renderer">
     <div v-if="error">
       <p class="error">Failed to render diagram: {{ error }}</p>
-      <n-code :code="props.diagram" :inline="false" :show-line-numbers="true" />
+      <div class="diagram-code" v-if="diagram">
+        <n-code :code="props.diagram"/>
+      </div>
     </div>
     <div v-else-if="!diagramSvg" class="loading">
       Rendering diagram...
     </div>
     <div v-else-if="diagramSvg && height > 0 && width > 0" class="diagram">
-      <n-image :src="diagramSrc ?? ''" :width="width" :height="height" :theme-overrides="imageGroupThemeOverrides" />
+      <n-image :src="diagramSrc" :width="width" :height="height" :theme-overrides="imageGroupThemeOverrides" />
     </div>
     <div v-else class="empty">
       No diagram to render
@@ -102,10 +108,9 @@ watch(() => props.diagram, updateDiagram, { immediate: true })
   margin: 12px 0;
   height: fit-content;
   overflow: auto;
-
+  border-radius: v-bind('theme.borderRadius');
   border: 1px solid v-bind('theme.borderColor');
   box-sizing: border-box;
-  /* I don't know why I cannot get the mermaid rendered into dark theme */
   background-color: v-bind('theme.modalColor');
 }
 
@@ -115,7 +120,12 @@ watch(() => props.diagram, updateDiagram, { immediate: true })
   padding-right: 8px;
   box-sizing: border-box;
   overflow-y: auto;
-  max-height: 48px;
+  max-height: 6em;
+}
+
+.diagram-code {
+  padding: 6px 8px;
+  box-sizing: border-box;
 }
 
 .loading {

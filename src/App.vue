@@ -86,7 +86,7 @@ const themeOverrides = computed(() => ({
       <n-modal-provider>
         <n-message-provider>
           <!-- Main Chat Component -->
-          <Chat :use-virtual-scroll="false"/> <!-- Buggy for virtual scroll  -->
+          <Chat :use-bubble-culling="true"/> <!-- Buggy for virtual scroll  -->
         </n-message-provider>
       </n-modal-provider>
     </n-dialog-provider>

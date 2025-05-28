@@ -9,10 +9,16 @@ const props = defineProps<{
   over?: boolean
 }>()
 
+const ready = defineModel('ready', {
+  default: false,
+  required: false
+})
+
 // VNode mode
 const VueMdastRenderer = inject('MarkdownRenderer') as ReturnType<typeof useVNodeRenderer>
 const content = computedAsync(async () => {
-  return await VueMdastRenderer(props.text, props.over ?? true)
+  const result = await VueMdastRenderer(props.text, props.over ?? true, () => ready.value = true, (containMermaid) => ready.value = !containMermaid)
+  return result
 });
 </script>
 

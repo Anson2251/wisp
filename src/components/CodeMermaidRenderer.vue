@@ -6,6 +6,9 @@ import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import MermaidRenderer from "./MermaidRenderer.vue";
 
 const theme = useThemeVars()
+const emits = defineEmits<{
+  (e: 'ready', success: boolean): void
+}>()
 
 const props = defineProps<{
   code: string,
@@ -16,7 +19,7 @@ const props = defineProps<{
 <template>
   <div>
     <div v-if="props.language === 'mermaid-live'" style="max-width: 100%; overflow: auto;">
-      <mermaid-renderer :diagram="props.code"/>
+      <mermaid-renderer :diagram="props.code" @ready="emits('ready', $event)" />
     </div>
     <div v-else class="code-container" :style="{
       backgroundColor: theme.cardColor,
