@@ -1,9 +1,10 @@
 <script lang="ts" setup>
-import { NInput, NButton } from "naive-ui";
+import { NInput, NButton, NEmpty, NIcon } from "naive-ui";
+import { Chat48Regular } from "@vicons/fluent";
 import MessageBubble from "./MessageBubble.vue";
 import AutoScrollWrapper from "./AutoScrollWrapper.vue";
 import { useChatStore } from "../stores/chat";
-import { onMounted, ref, provide, watch } from "vue";
+import { ref, provide, watch } from "vue";
 import { Message, MessageRole } from "../libs/types";
 
 import { useMermaid } from "../composables/useMermaid";
@@ -14,21 +15,25 @@ provide("MarkdownRenderer", useVNodeRenderer());
 
 const chatStore = useChatStore();
 
+(window as any).chatStore = chatStore;
+
 const autoScrollWrapper = ref<typeof AutoScrollWrapper | null>(null);
 
 const props = defineProps({
   useBubbleCulling: {
     type: Boolean,
-    default: false
-  }
-})
-
-watch(() => chatStore.threadTreeDecisions, () => {
-  setTimeout(() => autoScrollWrapper.value?.scrollToBottom(true, true), 200);
+    default: false,
+  },
+  conversationId: {
+    type: String,
+    required: false,
+  },
 });
 
+console.log(`[Chat] Message bubble culling enabled`);
+
 const sendMessage = () => {
-  if (!chatStore.userInput.trim()) return
+  if (!chatStore.userInput.trim()) return;
   const userMessage: Omit<Message, "id"> = {
     text: chatStore.userInput,
     sender: MessageRole.User,
@@ -41,21 +46,25 @@ const sendMessage = () => {
     },
     onReceiving: () => {
       autoScrollWrapper.value?.scrollToBottom();
-    }
-  })
-}
+    },
+  });
+};
 
 const regenerateMessage = (messageId: string, insertGuidance = false) => {
-  chatStore.regenerateMessage(messageId, {
-    beforeSend: () => {
-      chatStore.clearUserInput();
-      autoScrollWrapper.value?.scrollToBottom(false);
+  chatStore.regenerateMessage(
+    messageId,
+    {
+      beforeSend: () => {
+        chatStore.clearUserInput();
+        autoScrollWrapper.value?.scrollToBottom(false);
+      },
+      onReceiving: () => {
+        autoScrollWrapper.value?.scrollToBottom();
+      },
     },
-    onReceiving: () => {
-      autoScrollWrapper.value?.scrollToBottom();
-    }
-  }, insertGuidance);
-}
+    insertGuidance
+  );
+};
 
 const resendMessage = (messageId: string, text: string, derive: boolean) => {
   if (derive) {
@@ -66,54 +75,55 @@ const resendMessage = (messageId: string, text: string, derive: boolean) => {
       },
       onReceiving: () => {
         autoScrollWrapper.value?.scrollToBottom();
-      }
+      },
     });
   } else {
     (async () => {
-      await chatStore.updateMessage(messageId, text)
-      regenerateMessage(messageId)
+      await chatStore.updateMessage(messageId, text);
+      regenerateMessage(messageId);
     })();
   }
-}
+};
 
 const navigateToSibling = (id: string, direction: number) => {
   const index = chatStore.threadTree.getNodeDepth(id) - 1;
   chatStore.changeThreadTreeDecision(index, direction, true);
 };
 
-onMounted(async () => {
-  if (props.useBubbleCulling) console.log(`[Chat] Message bubble culling enabled`)
-  try {
-    const conversations = await chatStore.listConversations();
-    let conversationId = "";
+const loadConversationWithId = async (id?: string) => {
+  if (!id) return;
 
-    if (conversations.length == 0) {
-      conversationId = await chatStore.createConversation(
-        "Untitled Conversation",
-        "",
-      );
-    } else conversationId = conversations[0].id;
+  chatStore.currentConversationId = id;
+  console.log("[Chat] Current conversation id: ", id);
 
-    chatStore.currentConversationId = conversationId;
-    console.log("[Chat] Current conversation id: ", conversationId);
+  await chatStore.loadConversation(id);
+  setTimeout(() => {
+    autoScrollWrapper.value?.scrollToBottom();
+  }, 500);
+};
 
-    await chatStore.loadConversation(conversationId)
-    setTimeout(() => {
-      autoScrollWrapper.value?.scrollToBottom();
-    }, 500);
-  } catch (error) {
-    console.error("[Chat] Error loading messages:", error);
+watch(
+  () => props.conversationId,
+  async (newId) => {
+    try {
+      await loadConversationWithId(newId);
+      setTimeout(() => autoScrollWrapper.value?.scrollToBottom(true, false), 500);
+    } catch (error) {
+      console.error("[Chat] Error loading conversation:", error);
+    }
   }
-});
+);
 </script>
 
 <template>
-  <div class="chat-container">
+  <div v-if="chatStore.currentConversationId" class="chat-container">
     <div class="messages-container">
       <AutoScrollWrapper
+        v-if="chatStore.displayedMessage.length > 0"
         ref="autoScrollWrapper"
         :auto="true"
-        :smooth="true">
+        :smooth="true"
+      >
         <div class="bubble-container">
           <MessageBubble
             v-for="(message, index) in chatStore.displayedMessage"
@@ -122,23 +132,45 @@ onMounted(async () => {
             :sender="message.sender"
             :timestamp="new Date(message.timestamp * 1000)"
             :id="message.id"
-            :over="index === chatStore.displayedMessage.length - 1 && !chatStore.isStreaming"
+            :over="
+              index === chatStore.displayedMessage.length - 1 &&
+              !chatStore.isStreaming
+            "
             :hasPrevious="message.hasPrevious"
             :hasNext="message.hasNext"
             :culling="useBubbleCulling"
             @previous="() => navigateToSibling(message.id, -1)"
             @next="() => navigateToSibling(message.id, 1)"
             @resend="(derive, text) => resendMessage(message.id, text, derive)"
-            @regenerate="() => regenerateMessage(message.id, true)" />
+            @regenerate="() => regenerateMessage(message.id, true)"
+          />
         </div>
       </AutoScrollWrapper>
+      <div v-else class="placeholder-container">
+        <n-empty description="Let's chatting!">
+          <template #icon>
+            <n-icon :size="48">
+              <Chat48Regular />
+            </n-icon>
+          </template>
+        </n-empty>
+      </div>
     </div>
 
     <div class="input-container">
-      <n-input v-model:value="chatStore.userInput" placeholder="Type your message..." @keyup.enter="sendMessage"
-        clearable round type="textarea" />
+      <n-input
+        v-model:value="chatStore.userInput"
+        placeholder="Type your message..."
+        @keyup.enter="sendMessage"
+        clearable
+        round
+        type="textarea"
+      />
       <n-button type="primary" @click="sendMessage" round>Send</n-button>
     </div>
+  </div>
+  <div v-else class="placeholder-container">
+    <n-empty :show-icon="false" description="Select a conversation to start" />
   </div>
 </template>
 
@@ -146,7 +178,14 @@ onMounted(async () => {
 .chat-container {
   display: grid;
   grid-template-rows: 1fr auto;
-  height: 100vh;
+  height: 100%;
+}
+
+.placeholder-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
 }
 
 .messages-container {
@@ -165,7 +204,6 @@ onMounted(async () => {
 .bubble-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
   padding: 8px;
 }
 </style>

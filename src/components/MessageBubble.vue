@@ -223,7 +223,6 @@ const editMessage = () => {
 .message-bubble {
   max-width: 80%;
   width: fit-content;
-  margin-bottom: 16px;
 
   display: grid;
   grid-template-columns: auto;
