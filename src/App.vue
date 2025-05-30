@@ -105,13 +105,13 @@ const handleConversationSelect = (id: string) => {
           <n-split
             direction="horizontal"
             style="height: 100vh"
-            :max="'400px'"
-            :min="'0px'"
-            :default-size="'320px'"
+            :max="'240px'"
+            :min="'128px'"
+            :default-size="'160px'"
           >
             <template #1>
               <div style="height: 100%">
-                <ConversationList @select="handleConversationSelect" />
+                <conversation-list @select="handleConversationSelect" />
               </div>
             </template>
             <template #2>

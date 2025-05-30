@@ -92,12 +92,14 @@ const getDiagram = async (diagram: string, options: MermaidConfig) => {
 	}
 }
 
-const renderWithCache = async (diagram: string, cacheKey: string, options: MermaidConfig) => {
+const renderWithCache = async (diagram: string, options: MermaidConfig) => {
 	// Check memory cache first
-	if (memoryCache.value.has(cacheKey)) {
+	if (memoryCache.value.has(diagram)) {
 		// console.info("[useMermaid] Memory cache hit for diagram", { cacheKey })
-		return memoryCache.value.get(cacheKey)!
+		return memoryCache.value.get(diagram)!
 	}
+
+	const cacheKey = await hashContent(JSON.stringify({ diagram, options }))
 
 	// Check SQLite cache
 	const cached = await getCachedDiagram(cacheKey)
@@ -132,8 +134,7 @@ export function useMermaid() {
 
 		try {
 			if (allowCache) {
-				const cacheKey = await hashContent(JSON.stringify({ diagram, mermaidOptions }))
-				const result = await renderWithCache(diagram, cacheKey, mermaidOptions)
+				const result = await renderWithCache(diagram, mermaidOptions)
 				result.svg = addBackgroundToSvg(result.svg, bgColour)
 				return result
 			}

@@ -192,7 +192,7 @@ const showContextMenu = async (e: MouseEvent, conversation: any) => {
 }
 
 .conversation-list:deep(*) {
-  cursor: pointer !important;
+  cursor: pointer;
 }
 
 .selected {

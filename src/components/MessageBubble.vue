@@ -23,22 +23,22 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { MessageRole } from "../libs/types";
 import { useChatStore } from "../stores/chat";
 import { ref, computed, useTemplateRef, watch } from "vue";
-import MessageBubbleEditor from "./MessageBubbleEditor.vue";
 import { mixColours } from "../utils/colour";
 import { useElementSize, useElementVisibility } from "@vueuse/core";
+import { debounce } from "lodash";
 
 const { deleteMessage } = useChatStore();
 const dialog = useDialog();
 const theme = useThemeVars();
 
 const borderColor = computed(() =>
-  props.sender === MessageRole.User ? "transparent" : theme.value.borderColor
+  props.sender === MessageRole.User ? "transparent" : theme.value.borderColor,
 );
 
 const backgroundColor = computed(() =>
   props.sender === MessageRole.User
     ? mixColours(theme.value.primaryColor, theme.value.baseColor, 0.3)
-    : theme.value.cardColor
+    : theme.value.cardColor,
 );
 
 const border = computed(() => `1px solid ${borderColor.value}`);
@@ -56,9 +56,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "resend", derive: boolean, text: string): void;
+  (e: "edit"): void;
   (e: "regenerate"): void;
   (e: "previous"): void;
   (e: "next"): void;
+  (e: "ready"): void;
 }>();
 
 const container = useTemplateRef<HTMLDivElement>("container");
@@ -69,10 +71,13 @@ const visible = useElementVisibility(container);
 if (props.culling) {
   const size = useElementSize(container);
 
-  watch([size.height, rendered, visible], (newVal) => {
-    if (!visible.value || !rendered.value) return;
-    height.value = Math.round(newVal[0]);
-  });
+  watch(
+    [size.height, rendered, visible],
+    debounce((newVal) => {
+      if (!rendered.value) return;
+      height.value = Math.round(newVal[0]);
+    }, 100),
+  );
 }
 
 const copyMessage = async () => {
@@ -95,11 +100,6 @@ const removeMessage = () => {
       console.log("Message deleted:", props.id);
     },
   });
-};
-
-const showEditorModal = ref(false);
-const editMessage = () => {
-  showEditorModal.value = true;
 };
 </script>
 
@@ -128,6 +128,11 @@ const editMessage = () => {
                 :text="text"
                 :over="over"
                 v-model:ready="rendered"
+                @update:ready="
+                  (ready) => {
+                    if (ready) emit('ready');
+                  }
+                "
               />
             </div>
           </div>
@@ -159,7 +164,7 @@ const editMessage = () => {
                     <n-icon :component="ArrowClockwise16Regular" :size="16" />
                   </template>
                 </n-button>
-                <n-button quaternary :onclick="editMessage" size="tiny">
+                <n-button quaternary :onclick="() => emit('edit')" size="tiny">
                   <template #icon>
                     <n-icon :component="Edit16Regular" :size="16" />
                   </template>
@@ -192,11 +197,6 @@ const editMessage = () => {
           </div>
         </div>
       </n-flex>
-      <MessageBubbleEditor
-        v-model:show="showEditorModal"
-        :id="id"
-        @resend="(derive, text) => emit('resend', derive, text)"
-      />
     </div>
   </div>
 </template>

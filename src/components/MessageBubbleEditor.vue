@@ -39,6 +39,7 @@ const loadingSave = ref(false)
 const loadingResend = ref(false)
 
 const loadMessage = () => {
+  if (!props.id) return
   chat.getMessage(props.id).then((message) => {
     if (!message) {
       console.error("Message not found")

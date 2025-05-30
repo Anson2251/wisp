@@ -29,6 +29,10 @@ const props = defineProps({
     type: Number,
     default: 1
   },
+  allowMaximised: {
+    type: Boolean,
+    default: true
+  }
 })
 
 const themeVars = useThemeVars()
@@ -45,6 +49,10 @@ const originalState = ref({
 })
 
 const toggleMaximize = (e: MouseEvent) => {
+  if (!props.allowMaximised)  {
+    isMaximized.value = false
+    return
+  }
   e.stopPropagation()
 
   if (isMaximized.value) {
@@ -216,7 +224,7 @@ onUnmounted(() => {
     <div class="title-bar" @mousedown="startDrag">
       <n-text strong>{{ title  }}</n-text>
       <n-button-group class="window-controls">
-        <n-button quaternary @click.stop="toggleMaximize" size="small" @mousedown="(e) => e.stopPropagation()">
+        <n-button quaternary @click.stop="toggleMaximize" size="small" @mousedown="(e) => e.stopPropagation()" v-if="allowMaximised">
           <template #icon>
             <n-icon :component="isMaximized ? ArrowMinimize16Filled : ArrowMaximize16Filled" size="16"
               class="control-icon" :color="themeVars.textColorBase"/>
@@ -284,10 +292,14 @@ onUnmounted(() => {
 .title-bar {
   padding: 4px 4px 4px 12px;
   background-color: v-bind('themeVars.tableHeaderColor');
-  cursor: move;
+  cursor: move !important;
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.title-bar:deep(*):not(button, button:deep(*)) {
+  cursor: move;
 }
 
 .window-controls {
@@ -326,7 +338,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   height: 4px;
-  cursor: ns-resize;
+  cursor: ns-resize !important;
 }
 
 .right {
@@ -334,7 +346,7 @@ onUnmounted(() => {
   right: 0;
   bottom: 0;
   width: 4px;
-  cursor: ew-resize;
+  cursor: ew-resize !important;
 }
 
 .bottom {
@@ -342,7 +354,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   height: 4px;
-  cursor: ns-resize;
+  cursor: ns-resize !important;
 }
 
 .left {
@@ -350,7 +362,7 @@ onUnmounted(() => {
   left: 0;
   bottom: 0;
   width: 4px;
-  cursor: ew-resize;
+  cursor: ew-resize !important;
 }
 
 .top-left {
@@ -358,27 +370,27 @@ onUnmounted(() => {
   left: 0;
   width: 6px;
   height: 6px;
-  cursor: nwse-resize;
+  cursor: nwse-resize !important;
 }
 .top-right {
   top: 0;
   right: 0;
   width: 6px;
   height: 6px;
-  cursor: nesw-resize;
+  cursor: nesw-resize !important;
 }
 .bottom-left {
   bottom: 0;
   left: 0;
   width: 6px;
   height: 6px;
-  cursor: nesw-resize;
+  cursor: nesw-resize !important;
 }
 .bottom-right {
   bottom: 0;
   right: 0;
   width: 6px;
   height: 6px;
-  cursor: nwse-resize;
+  cursor: nwse-resize !important;
 }
 </style>

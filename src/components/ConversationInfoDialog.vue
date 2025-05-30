@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, watch, type PropType } from "vue";
-import { NThing, NInput, NButton, NButtonGroup } from "naive-ui";
+import { NThing, NInput, NButton } from "naive-ui";
 import Window from "./Window.vue";
 import { useChatStore } from "../stores/chat";
 import type { Conversation } from "../libs/types";
@@ -39,7 +39,7 @@ const saveChanges = async () => {
 </script>
 
 <template>
-  <window :title="'Conversation Info'" @close="onClose">
+  <window :title="'Conversation Info'" @close="onClose" :initial-height="200" :initial-width="300" :allow-maximised="false">
     <div class="info-content">
       <n-thing>
         <template #header>
@@ -71,10 +71,10 @@ const saveChanges = async () => {
     </div>
 
     <template #footer>
-      <n-button-group>
-        <n-button :disabled="!hasChanges" @click="saveChanges"> Save </n-button>
+      <div class="footer">
         <n-button @click="() => onClose()"> Cancel </n-button>
-      </n-button-group>
+        <n-button :disabled="!hasChanges" @click="saveChanges"> Save </n-button>
+      </div>
     </template>
   </window>
 </template>
@@ -82,5 +82,12 @@ const saveChanges = async () => {
 <style scoped>
 .info-content {
   padding: 16px;
+}
+
+.footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  height: fit-content;
 }
 </style>

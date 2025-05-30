@@ -6,6 +6,7 @@ import AutoScrollWrapper from "./AutoScrollWrapper.vue";
 import { useChatStore } from "../stores/chat";
 import { ref, provide, watch } from "vue";
 import { Message, MessageRole } from "../libs/types";
+import MessageBubbleEditor from "./MessageBubbleEditor.vue";
 
 import { useMermaid } from "../composables/useMermaid";
 import { useVNodeRenderer } from "../composables/useMarkdown";
@@ -62,7 +63,7 @@ const regenerateMessage = (messageId: string, insertGuidance = false) => {
         autoScrollWrapper.value?.scrollToBottom();
       },
     },
-    insertGuidance
+    insertGuidance,
   );
 };
 
@@ -87,19 +88,32 @@ const resendMessage = (messageId: string, text: string, derive: boolean) => {
 
 const navigateToSibling = (id: string, direction: number) => {
   const index = chatStore.threadTree.getNodeDepth(id) - 1;
+  bubbleReadyCount.value = index + 1;
+  console.time("[Chat] Message list loaded");
   chatStore.changeThreadTreeDecision(index, direction, true);
 };
 
+const allMessageBubbleReady = () => {
+  console.timeEnd("[Chat] Message list loaded");
+  setTimeout(() => autoScrollWrapper.value?.scrollToBottom(true, false), 300);
+};
+const bubbleReadyCount = ref(0)
+watch(bubbleReadyCount, () => {
+  if (bubbleReadyCount.value === chatStore.displayedMessage.length) {
+    allMessageBubbleReady()
+  }
+})
+
 const loadConversationWithId = async (id?: string) => {
   if (!id) return;
+
+  console.time("[Chat] Message list loaded");
+  bubbleReadyCount.value = 0
 
   chatStore.currentConversationId = id;
   console.log("[Chat] Current conversation id: ", id);
 
   await chatStore.loadConversation(id);
-  setTimeout(() => {
-    autoScrollWrapper.value?.scrollToBottom();
-  }, 500);
 };
 
 watch(
@@ -108,12 +122,19 @@ watch(
     try {
       console.log("[Chat] Watching conversation id change:", newId);
       await loadConversationWithId(newId);
-      setTimeout(() => autoScrollWrapper.value?.scrollToBottom(true, false), 500);
     } catch (error) {
       console.error("[Chat] Error loading conversation:", error);
     }
-  }
+  },
 );
+
+const showEditorModal = ref(false);
+const messageEditingId = ref<string | null>(null);
+
+const showEditor = (messageId: string) => {
+  messageEditingId.value = messageId;
+  showEditorModal.value = true;
+};
 </script>
 
 <template>
@@ -142,8 +163,9 @@ watch(
             :culling="useBubbleCulling"
             @previous="() => navigateToSibling(message.id, -1)"
             @next="() => navigateToSibling(message.id, 1)"
-            @resend="(derive, text) => resendMessage(message.id, text, derive)"
+            @edit="() => showEditor(message.id)"
             @regenerate="() => regenerateMessage(message.id, true)"
+            @ready="() => bubbleReadyCount += 1"
           />
         </div>
       </AutoScrollWrapper>
@@ -169,6 +191,17 @@ watch(
       />
       <n-button type="primary" @click="sendMessage" round>Send</n-button>
     </div>
+    <MessageBubbleEditor
+      v-model:show="showEditorModal"
+      :id="messageEditingId ?? ''"
+      @resend="
+        (derive: boolean, text: string) => {
+          if (!messageEditingId) return;
+          resendMessage(messageEditingId, text, derive);
+          messageEditingId = '';
+        }
+      "
+    />
   </div>
   <div v-else class="placeholder-container">
     <n-empty :show-icon="false" description="Select a conversation to start" />
