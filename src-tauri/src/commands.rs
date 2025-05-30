@@ -189,6 +189,26 @@ pub async fn delete_conversation(
 }
 
 #[tauri::command]
+pub async fn update_conversation(
+	app_handle: AppHandle,
+	conversation_id: String,
+	name: Option<String>,
+	description: Option<String>,
+) -> Result<(), String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let mut state = state.lock().unwrap();
+
+	if let Some(name) = name {
+		state.chat.conversation_manager.update_name(&conversation_id, &name).map_err(|e| e.to_string())?;
+	}
+
+	if let Some(description) = description {
+		state.chat.conversation_manager.update_description(&conversation_id, &description).map_err(|e| e.to_string())?;
+	}
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn list_conversations(app_handle: AppHandle) -> Result<Vec<Conversation>, String> {
     let state = app_handle.state::<Mutex<AppData>>();
     let mut state = state.lock().unwrap();

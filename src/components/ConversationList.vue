@@ -1,31 +1,27 @@
 <script lang="ts" setup>
-import {
-  NButton,
-  NPopover,
-  NIcon,
-  NThing,
-  NPerformantEllipsis,
-} from "naive-ui";
-import { MoreHorizontal16Regular } from "@vicons/fluent";
+import { NButton } from "naive-ui";
 import { useChatStore } from "../stores/chat";
 import { onMounted, ref } from "vue";
-import { computedAsync } from "@vueuse/core";
 import { useThemeVars } from "naive-ui";
-
-const infoClicked = ref<boolean[]>([])
+import { Menu, MenuItem } from "@tauri-apps/api/menu";
+import ConversationInfoDialog from "./ConversationInfoDialog.vue";
+import { useMessage } from "naive-ui";
 
 const theme = useThemeVars();
+const message = useMessage();
 const chatStore = useChatStore();
-const conversations = computedAsync(async () => {
-  const result = await chatStore.listConversations()
-  infoClicked.value = (new Array(result.length)).fill(false)
-  return result
-}, []);
+const conversations = chatStore.conversations
 const selectedId = ref<string>();
 
+chatStore.listConversations();
+
+// Info dialog state
+const showInfoDialog = ref(false);
+const activeConversation = ref<any>(null);
+
 onMounted(async () => {
-  if (conversations.value.length > 0) {
-    selectedId.value = conversations.value[0].id;
+  if (conversations.length > 0) {
+    selectedId.value = conversations[0].id;
   }
 });
 
@@ -40,9 +36,48 @@ const handleSelect = (id: string) => {
 
 const handleNewConversation = async () => {
   const newId = await chatStore.createConversation("New Conversation", "");
-  conversations.value = await chatStore.listConversations();
   selectedId.value = newId;
   emit("select", newId);
+};
+
+const handleDeleteConversation = async (id: string) => {
+  try {
+  await chatStore.deleteConversation(id);
+  if (selectedId.value === id && conversations.length > 0) {
+    selectedId.value = conversations[0].id;
+    emit("select", selectedId.value);
+  } else if (conversations.length === 0) {
+    selectedId.value = undefined;
+  }
+}
+catch (e) {
+  message.error(e as string)
+}
+};
+
+const showContextMenu = async (e: MouseEvent, conversation: any) => {
+  e.stopPropagation();
+
+  const menu = await Menu.new();
+
+  await menu.append(
+    await MenuItem.new({
+      text: "Delete",
+      action: () => handleDeleteConversation(conversation.id),
+    })
+  );
+
+  await menu.append(
+    await MenuItem.new({
+      text: "Info",
+      action: () => {
+        activeConversation.value = conversation;
+        showInfoDialog.value = true;
+      },
+    })
+  );
+
+  await menu.popup();
 };
 </script>
 
@@ -54,51 +89,36 @@ const handleNewConversation = async () => {
       </n-button>
     </div>
     <div
-      v-for="(conv, index) in conversations"
+      v-for="conv in chatStore.conversations"
       :class="[
         'conversation-item',
         ...(selectedId === conv.id ? ['selected'] : []),
-        ...(infoClicked[index]  ? ['clicked-active'] : []),
       ]"
-
       :key="conv.id"
       @click="handleSelect(conv.id)"
+      @contextmenu="
+        (e) => {
+          e.preventDefault();
+          showContextMenu(e, conv);
+        }
+      "
     >
       <div class="item-title">{{ conv.name }}</div>
       <div class="item-description">
         {{ conv.description || "No description available." }}
       </div>
-      <div class="item-info">
-        <n-popover trigger="click" v-model:show="infoClicked[index]">
-          <template #trigger>
-            <n-icon :size="24">
-              <more-horizontal16-regular />
-            </n-icon>
-          </template>
-          <n-thing>
-            <template #header>
-              <div>{{ conv.name }}</div>
-            </template>
-            <template #description>
-              <n-performant-ellipsis style="max-width: 16em">{{
-                conv.description || "No description available."
-              }}</n-performant-ellipsis>
-            </template>
-            <template #footer>
-              <div style="font-size: 0.8em">
-                <div>
-                  <n-performant-ellipsis
-                    style="max-width: 16em; font-family: monospace"
-                  >
-                    ID: {{ conv.id }}
-                  </n-performant-ellipsis>
-                </div>
-              </div>
-            </template>
-          </n-thing>
-        </n-popover>
-      </div>
     </div>
+
+    <conversation-info-dialog
+      v-if="showInfoDialog && activeConversation"
+      :conversation="activeConversation"
+      :onClose="
+        () => {
+          showInfoDialog = false;
+          activeConversation = null;
+        }
+      "
+    />
   </div>
 </template>
 
@@ -124,7 +144,7 @@ const handleNewConversation = async () => {
   box-sizing: border-box;
 
   display: grid;
-  grid-template-columns: auto 0;
+  grid-template-columns: auto;
   grid-template-rows: auto auto;
   transition: background-color,
     grid-template-columns 0.2s v-bind("theme.cubicBezierEaseOut");
@@ -132,8 +152,7 @@ const handleNewConversation = async () => {
   --info-icon-opacity: 0;
 }
 
-.clicked-active, .conversation-item:hover {
-  grid-template-columns: auto 3em;
+.conversation-item:hover {
   background-color: v-bind("theme.hoverColor");
   transition: background-color,
     grid-template-columns 0.2s v-bind("theme.cubicBezierEaseIn");

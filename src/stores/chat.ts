@@ -19,7 +19,7 @@ export const useChatStore = defineStore('chat', () => {
 	const currentConversationId = ref<string | null>(null)
 	const threadTree = reactive<MessageThreadTree>(new MessageThreadTree())
 	const rootMessageId = ref<string | null>(null)
-	const conversations = ref<{ id: string, name: string }[]>([])
+	const conversations = ref<Conversation[]>([])
 
 	const messages = ref<Map<string, Message>>(new Map())
 
@@ -255,6 +255,8 @@ export const useChatStore = defineStore('chat', () => {
 		try {
 			const identifier = '[ChatStore] Time to load conversation'
 			console.time(identifier)
+			unmountCurrentConversation()
+
 			await loadMessages(conversationId)
 			await loadThreadTree(conversationId)
 
@@ -326,11 +328,54 @@ export const useChatStore = defineStore('chat', () => {
 	const listConversations = () => {
 		return new Promise<Conversation[]>((resolve, reject) => {
 			Commands.listConversations()
-				.then((conversations) => {
-					resolve(conversations)
+				.then((convs) => {
+					conversations.value = convs
+					resolve(convs)
 				})
 				.catch((err) => {
 					console.error('[ChatStore] Failed to list conversations:', err)
+					reject(err)
+				})
+		})
+	}
+
+	const updateConversation = (id: string, newMetaData: Partial<Omit<Omit<Conversation, 'id'>, 'entry_message_id'>>) => {
+		return new Promise<void>((resolve, reject) => {
+			Commands.updateConversation(id, newMetaData)
+				.then(() => {
+					const conversation = conversations.value.find(c => c.id === id)
+					if (conversation) {
+						conversation.name = newMetaData.name || conversation.name
+						conversation.description = newMetaData.description || conversation.description
+						resolve()
+					}
+				})
+				.catch((err) => {
+					console.error('[ChatStore] Failed to update conversation:', err)
+					reject(err)
+				})
+		})
+	}
+
+	const unmountCurrentConversation = () => {
+		displayedMessages.value = []
+		messages.value.clear()
+		threadTree.clear()
+		threadTreeDecisions.value = []
+		rootMessageId.value = null
+	}
+
+	const deleteConversation = (id: string) => {
+		return new Promise<void>((resolve, reject) => {
+			Commands.deleteConversation(id)
+				.then(() => {
+					unmountCurrentConversation()
+					currentConversationId.value = null
+					conversations.value = conversations.value.filter(c => c.id !== id)
+					resolve()
+				})
+				.catch((err) => {
+					console.error('[ChatStore] Failed to delete conversation:', err)
 					reject(err)
 				})
 		})
@@ -404,6 +449,9 @@ export const useChatStore = defineStore('chat', () => {
 		getMessage,
 		createConversation,
 		listConversations,
+		updateConversation,
+		deleteConversation,
+		conversations,
 		updateMessage,
 		deleteMessage,
 		currentConversationId,

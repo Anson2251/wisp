@@ -20,7 +20,7 @@ impl Conversations {
 					name TEXT NOT NULL,
 					description TEXT,
 					entry_message_id TEXT,
-					FOREIGN KEY (entry_message_id) REFERENCES {} (id)
+					FOREIGN KEY (entry_message_id) REFERENCES {} (id) ON DELETE CASCADE
 				)",
                 Self::TABLE_NAME,
 				message_table_name

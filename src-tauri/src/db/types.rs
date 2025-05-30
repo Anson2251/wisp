@@ -11,7 +11,7 @@ pub struct ThreadTreeItem {
 
 #[derive(Debug, Error)]
 pub enum ChatError {
-    #[error("Database error: {0}")]
+    #[error("Database error in Chat: {0}")]
     Database(#[from] rusqlite::Error),
     #[error("Connection pool error: {0}")]
     Pool(#[from] r2d2::Error),
@@ -26,7 +26,7 @@ pub enum ChatError {
 
 #[derive(Debug, Error)]
 pub enum ConversationError {
-    #[error("Database error: {0}")]
+    #[error("Database error in Conversation: {0}")]
     Database(#[from] rusqlite::Error),
     #[error("Connection pool error: {0}")]
     Pool(#[from] r2d2::Error),
@@ -45,7 +45,7 @@ pub struct Conversation {
 
 #[derive(Debug, Error)]
 pub enum ThreadError {
-    #[error("Database error: {0}")]
+    #[error("Database error in Thread: {0}")]
     Database(#[from] rusqlite::Error),
     #[error("Connection pool error: {0}")]
     Pool(#[from] r2d2::Error),
@@ -58,7 +58,7 @@ pub enum ThreadError {
 
 #[derive(Debug, Error)]
 pub enum MessageError {
-    #[error("Database error: {0}")]
+    #[error("Database error in Message: {0}")]
     Database(#[from] rusqlite::Error),
     #[error("Connection pool error: {0}")]
     Pool(#[from] r2d2::Error),

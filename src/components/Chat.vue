@@ -106,6 +106,7 @@ watch(
   () => props.conversationId,
   async (newId) => {
     try {
+      console.log("[Chat] Watching conversation id change:", newId);
       await loadConversationWithId(newId);
       setTimeout(() => autoScrollWrapper.value?.scrollToBottom(true, false), 500);
     } catch (error) {

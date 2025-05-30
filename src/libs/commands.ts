@@ -79,6 +79,14 @@ export async function updateConversationEntryId(conversationId: string, newEntry
 	});
 }
 
+export async function updateConversation(conversationId: string, newMetaData: Partial<Omit<Omit<Conversation, 'id'>, 'entry_message_id'>>) {
+	return new Promise<void>((resolve, reject) => {
+		invoke('update_conversation', { conversationId, ...newMetaData })
+			.then(() => resolve())
+			.catch((error: any) => reject(error));
+	});
+}
+
 export async function deleteConversation(conversationId: string): Promise<void> {
 	return new Promise((resolve, reject) => {
 		invoke('delete_conversation', { conversationId })
