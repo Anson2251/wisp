@@ -13,7 +13,7 @@ use types::AppData;
 #[cfg(target_os = "macos")]
 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 #[cfg(target_os = "windows")]
-use tauri_plugin_blur::apply_blur;
+use window_vibrancy::{apply_blur};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
