@@ -31,8 +31,9 @@ export const useChatStore = defineStore('chat', () => {
 	type SendMessageCallbacks = {
 		beforeSend: (botMessageId: string) => void;
 		onReceiving: (chunk: string) => void;
+		onFinish: (text: string) => void
 	}
-	const sendMessage = async (message: Omit<Message, 'id'>, { beforeSend, onReceiving }: Partial<SendMessageCallbacks>, parentMessageId = lastMessageId.value ?? undefined) => {
+	const sendMessage = async (message: Omit<Message, 'id'>, {beforeSend, onReceiving, onFinish}: Partial<SendMessageCallbacks> = {}, parentMessageId = lastMessageId.value ?? undefined) => {
 		const userMessageId = await addMessage(message, parentMessageId, true);
 
 		const botMessage: Omit<Message, "id"> = {
@@ -62,12 +63,13 @@ export const useChatStore = defineStore('chat', () => {
 			},
 			() => {
 				updateMessage(botMessageId, responseText);
+				if (onFinish) onFinish(responseText);
 			},
 			true,
 		);
 	}
 
-	const regenerateMessage = async (messageId: string, { beforeSend, onReceiving }: Partial<SendMessageCallbacks>, insertGuidance = false) => {
+	const regenerateMessage = async (messageId: string, { beforeSend, onReceiving, onFinish }: Partial<SendMessageCallbacks>, insertGuidance = false) => {
 		const parentId = threadTree.getParentId(messageId)
 		if (!parentId) return Promise.reject("Cannot regenerate the root message");
 
@@ -98,6 +100,7 @@ export const useChatStore = defineStore('chat', () => {
 			},
 			() => {
 				updateMessage(botMessageId, responseText);
+				if (onFinish) onFinish(responseText);
 			},
 			true,
 			insertGuidance
@@ -467,4 +470,3 @@ export const useChatStore = defineStore('chat', () => {
 		loadConversation,
 	}
 });
-

@@ -27,7 +27,7 @@ import { mixColours } from "../utils/colour";
 import { useElementSize, useElementVisibility } from "@vueuse/core";
 import { debounce } from "lodash";
 
-const { deleteMessage } = useChatStore();
+const chatStore = useChatStore();
 const dialog = useDialog();
 const theme = useThemeVars();
 
@@ -70,11 +70,10 @@ const visible = useElementVisibility(container);
 
 if (props.culling) {
   const size = useElementSize(container);
-
   watch(
     [size.height, rendered, visible],
     debounce((newVal) => {
-      if (!rendered.value) return;
+      if (!rendered.value || chatStore.isStreaming) return;
       height.value = Math.round(newVal[0]);
     }, 100),
   );
@@ -96,7 +95,7 @@ const removeMessage = () => {
     positiveText: "Delete",
     negativeText: "Cancel",
     onPositiveClick: async () => {
-      await deleteMessage(props.id);
+      await chatStore.deleteMessage(props.id);
       console.log("Message deleted:", props.id);
     },
   });
@@ -105,7 +104,7 @@ const removeMessage = () => {
 
 <template>
   <div ref="container">
-    <div v-if="!visible && height !== 0 && culling" class="placeholder"></div>
+    <div v-if="!visible && height !== 0 && culling && !chatStore.isStreaming" class="placeholder"></div>
     <div v-else class="item-container">
       <n-flex
         align="start"

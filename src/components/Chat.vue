@@ -46,8 +46,12 @@ const sendMessage = () => {
       autoScrollWrapper.value?.scrollToBottom(false);
     },
     onReceiving: () => {
-      autoScrollWrapper.value?.scrollToBottom();
+
+      autoScrollWrapper.value?.scrollToBottom(false);
     },
+    onFinish: () => {
+      setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 1000);
+    }
   });
 };
 
@@ -60,8 +64,11 @@ const regenerateMessage = (messageId: string, insertGuidance = false) => {
         autoScrollWrapper.value?.scrollToBottom(false);
       },
       onReceiving: () => {
-        autoScrollWrapper.value?.scrollToBottom();
+        autoScrollWrapper.value?.scrollToBottom(false);
       },
+      onFinish: () => {
+        setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 1000);
+      }
     },
     insertGuidance,
   );
