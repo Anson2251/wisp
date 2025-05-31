@@ -5,12 +5,13 @@ import { onMounted, ref } from "vue";
 import { useThemeVars } from "naive-ui";
 import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import ConversationInfoDialog from "./ConversationInfoDialog.vue";
-import { useMessage } from "naive-ui";
+import { useMessage, useDialog } from "naive-ui";
 
 const theme = useThemeVars();
 const message = useMessage();
+const dialog = useDialog();
 const chatStore = useChatStore();
-const conversations = chatStore.conversations
+const conversations = chatStore.conversations;
 const selectedId = ref<string>();
 
 chatStore.listConversations();
@@ -34,6 +35,25 @@ const handleSelect = (id: string) => {
   emit("select", id);
 };
 
+const confirmDeletion = () => {
+  return new Promise<boolean>((resolve) => {
+    dialog.warning({
+      title: "Confirm",
+      content:
+        "Are you sure you want to DELETE this conversation? \nThis action CANNOT BE UNDONE. \nALL conversation history will be LOST.",
+      positiveText: "Confirm",
+      negativeText: "Cancel",
+      draggable: true,
+      onPositiveClick: () => {
+        resolve(true);
+      },
+      onNegativeClick: () => {
+        resolve(false);
+      },
+    });
+  });
+};
+
 const handleNewConversation = async () => {
   const newId = await chatStore.createConversation("New Conversation", "");
   selectedId.value = newId;
@@ -41,18 +61,19 @@ const handleNewConversation = async () => {
 };
 
 const handleDeleteConversation = async (id: string) => {
+  const confirmed = await confirmDeletion();
+  if (!confirmed) return;
   try {
-  await chatStore.deleteConversation(id);
-  if (selectedId.value === id && conversations.length > 0) {
-    selectedId.value = conversations[0].id;
-    emit("select", selectedId.value);
-  } else if (conversations.length === 0) {
-    selectedId.value = undefined;
+    await chatStore.deleteConversation(id);
+    if (selectedId.value === id && conversations.length > 0) {
+      selectedId.value = conversations[0].id;
+      emit("select", selectedId.value);
+    } else if (conversations.length === 0) {
+      selectedId.value = undefined;
+    }
+  } catch (e) {
+    message.error(e as string);
   }
-}
-catch (e) {
-  message.error(e as string)
-}
 };
 
 const showContextMenu = async (e: MouseEvent, conversation: any) => {
@@ -64,7 +85,7 @@ const showContextMenu = async (e: MouseEvent, conversation: any) => {
     await MenuItem.new({
       text: "Delete",
       action: () => handleDeleteConversation(conversation.id),
-    })
+    }),
   );
 
   await menu.append(
@@ -74,7 +95,7 @@ const showContextMenu = async (e: MouseEvent, conversation: any) => {
         activeConversation.value = conversation;
         showInfoDialog.value = true;
       },
-    })
+    }),
   );
 
   await menu.popup();
@@ -82,33 +103,41 @@ const showContextMenu = async (e: MouseEvent, conversation: any) => {
 </script>
 
 <template>
-  <div class="conversation-list">
-    <div class="new-conversation">
-      <n-button type="primary" @click="handleNewConversation">
-        New Conversation
-      </n-button>
-    </div>
-    <div
-      v-for="conv in chatStore.conversations"
-      :class="[
-        'conversation-item',
-        ...(selectedId === conv.id ? ['selected'] : []),
-      ]"
-      :key="conv.id"
-      @click="handleSelect(conv.id)"
-      @contextmenu="
-        (e) => {
-          e.preventDefault();
-          showContextMenu(e, conv);
-        }
-      "
-    >
-      <div class="item-title">{{ conv.name }}</div>
-      <div class="item-description">
-        {{ conv.description || "No description available." }}
+  <div class="container">
+    <div class="list-container">
+      <div class="conversation-list">
+        <div
+          v-for="conv in chatStore.conversations"
+          :class="[
+            'conversation-item',
+            ...(selectedId === conv.id ? ['selected'] : []),
+          ]"
+          :key="conv.id"
+          @click="handleSelect(conv.id)"
+          @contextmenu="
+            (e) => {
+              e.preventDefault();
+              showContextMenu(e, conv);
+            }
+          "
+        >
+          <div class="item-title">{{ conv.name }}</div>
+          <div class="item-description">
+            {{ conv.description || "No description available." }}
+          </div>
+        </div>
+      </div>
+      <div style="width: 100%">
+        <n-button
+          type="primary"
+          dashed
+          @click="handleNewConversation"
+          style="width: 100%"
+        >
+          New Conversation
+        </n-button>
       </div>
     </div>
-
     <conversation-info-dialog
       v-if="showInfoDialog && activeConversation"
       :conversation="activeConversation"
@@ -123,7 +152,21 @@ const showContextMenu = async (e: MouseEvent, conversation: any) => {
 </template>
 
 <style scoped>
+.container {
+  height: 100%;
+  width: 100%;
+}
+
+.list-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
 .conversation-list {
+  flex-grow: 1;
   height: 100%;
   overflow-y: auto;
   display: flex;
@@ -146,7 +189,8 @@ const showContextMenu = async (e: MouseEvent, conversation: any) => {
   display: grid;
   grid-template-columns: auto;
   grid-template-rows: auto auto;
-  transition: background-color,
+  transition:
+    background-color,
     grid-template-columns 0.2s v-bind("theme.cubicBezierEaseOut");
 
   --info-icon-opacity: 0;
@@ -154,7 +198,8 @@ const showContextMenu = async (e: MouseEvent, conversation: any) => {
 
 .conversation-item:hover {
   background-color: v-bind("theme.hoverColor");
-  transition: background-color,
+  transition:
+    background-color,
     grid-template-columns 0.2s v-bind("theme.cubicBezierEaseIn");
   --info-icon-opacity: 1;
 }
