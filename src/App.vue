@@ -1,18 +1,21 @@
 <script setup lang="ts">
-import { NSplit } from "naive-ui";
-import Chat from "./components/Chat.vue";
-import ConversationList from "./components/ConversationList.vue";
 import {
   NDialogProvider,
   NConfigProvider,
   NModalProvider,
   NMessageProvider,
+  NIcon,
   useOsTheme,
   darkTheme,
   lightTheme,
 } from "naive-ui";
 import katex from "katex";
-import { provide, computed, ref } from "vue";
+import { provide, computed } from "vue";
+import {
+  ChatMultiple24Regular,
+  Bot24Regular,
+  Cube24Regular,
+} from "@vicons/fluent";
 import useHighlightjs from "./composables/useHighlightjs";
 const hljs = useHighlightjs();
 
@@ -24,46 +27,41 @@ provide("OpenAI", openai);
 const osThemeRef = useOsTheme();
 const isDark = computed(() => osThemeRef.value === "dark");
 const theme = computed(() => (isDark.value ? darkTheme : lightTheme));
-
-const selectedConversationId = ref<string>();
-const handleConversationSelect = (id: string) => {
-  selectedConversationId.value = id;
-};
 </script>
 
 <template>
-  <n-config-provider
-    :katex="(katex as any)"
-    :hljs="hljs"
-    :theme="theme"
-  >
+  <n-config-provider :katex="(katex as any)" :hljs="hljs" :theme="theme">
     <n-dialog-provider>
       <n-modal-provider>
         <n-message-provider>
-          <n-split
-            direction="horizontal"
-            style="height: 100vh"
-            :max="'240px'"
-            :min="'128px'"
-            :default-size="'160px'"
-          >
-            <template #1>
-              <div style="height: 100%">
-                <conversation-list @select="handleConversationSelect" />
-              </div>
-            </template>
-            <template #2>
-              <div style="height: 100%">
-                <Chat
-                  :use-bubble-culling="true"
-                  :conversation-id="selectedConversationId"
-                  :style="{
-                    backgroundColor: theme.common.cardColor,
-                  }"
-                />
-              </div>
-            </template>
-          </n-split>
+          <div class="container">
+            <div class="sidebar">
+              <router-link to="/chat" active-class="sidebar-item-active">
+                <div class="sidebar-item">
+                  <n-icon size="24"
+                    ><ChatMultiple24Regular
+                  /></n-icon>
+                </div>
+              </router-link>
+              <router-link to="/pals" active-class="sidebar-item-active">
+                <div class="sidebar-item">
+                  <n-icon size="24"
+                    ><Bot24Regular
+                  /></n-icon>
+                </div>
+              </router-link>
+              <router-link to="/providers" active-class="sidebar-item-active">
+                <div class="sidebar-item">
+                  <n-icon size="24"
+                    ><Cube24Regular
+                  /></n-icon>
+                </div>
+              </router-link>
+            </div>
+            <div class="main-content">
+              <KeepAlive><router-view /></KeepAlive>
+            </div>
+          </div>
         </n-message-provider>
       </n-modal-provider>
     </n-dialog-provider>
@@ -91,5 +89,55 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+}
+</style>
+
+<style scoped>
+.container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: 64px auto;
+}
+
+.sidebar {
+  grid-area: 1 / 1 / 2 / 2;
+  padding: 8px;
+  width: 100%;
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: v-bind('theme.common.textColor3');
+
+  height: 48px;
+  width: 48px;
+  border-radius: v-bind("theme.common.borderRadius");
+  transition: 0.2s v-bind("theme.common.cubicBezierEaseInOut");
+}
+
+.sidebar-item:hover:not(.sidebar-item-active .sidebar-item) {
+  background-color: v-bind("theme.common.hoverColor");
+}
+
+.sidebar-item-active svg {
+  color: v-bind('theme.common.textColor1');
+}
+
+.main-content {
+  grid-area: 1 / 2 / 3 / 2;
+  position: relative;
 }
 </style>
