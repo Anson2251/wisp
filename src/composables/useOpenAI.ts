@@ -13,7 +13,7 @@ export function useOpenAI() {
 		onFinish: () => void,
 		ignoreLastMessage: boolean = false,
 		insertRegenerateGuidancePrompt: boolean = false,
-	) => {
+	): Promise<void> => {
 		isStreaming.value = true
 		const unlisten = await listen<string>('openai_stream_chunk', (event) => {
 			onChunk(event.payload)
@@ -30,6 +30,7 @@ export function useOpenAI() {
 		}
 		catch (error) {
 			console.error('[useOpenAI] Error streaming response:', error)
+			return Promise.reject("Fail to stream response: " + error)
 		}
 		 finally {
 			unlisten()

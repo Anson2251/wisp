@@ -26,19 +26,20 @@ import { ref, computed, useTemplateRef, watch } from "vue";
 import { mixColours } from "../utils/colour";
 import { useElementSize, useElementVisibility } from "@vueuse/core";
 import { debounce } from "lodash";
+import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 
 const chatStore = useChatStore();
 const dialog = useDialog();
 const theme = useThemeVars();
 
 const borderColor = computed(() =>
-  props.sender === MessageRole.User ? "transparent" : theme.value.borderColor,
+  props.sender === MessageRole.User ? "transparent" : theme.value.borderColor
 );
 
 const backgroundColor = computed(() =>
   props.sender === MessageRole.User
     ? mixColours(theme.value.primaryColor, theme.value.baseColor, 0.3)
-    : theme.value.cardColor,
+    : theme.value.cardColor
 );
 
 const border = computed(() => `1px solid ${borderColor.value}`);
@@ -77,7 +78,7 @@ if (props.culling) {
     debounce((newVal) => {
       if (!rendered.value || isStreaming.value) return;
       height.value = Math.round(newVal[0]);
-    }, 100),
+    }, 100)
   );
 }
 
@@ -102,11 +103,62 @@ const removeMessage = () => {
     },
   });
 };
+
+const showContextMenu = async (e: MouseEvent) => {
+  e.stopPropagation();
+
+  const menu = await Menu.new();
+
+  const selectedText = window.getSelection()?.toString();
+  if (selectedText) {
+    await menu.append(
+      await MenuItem.new({
+        text: "Copy selected",
+        action: async () => await writeText(selectedText),
+      })
+    );
+
+    await menu.append(await PredefinedMenuItem.new({ item: "Separator" }));
+  }
+
+  await menu.append(
+    await MenuItem.new({
+      text: "Copy",
+      action: () => copyMessage(),
+    })
+  );
+
+  await menu.append(
+    await MenuItem.new({
+      text: "Delete",
+      action: () => removeMessage(),
+    })
+  );
+
+  await menu.append(
+    await MenuItem.new({
+      text: "Regenerate",
+      action: () => emit("regenerate"),
+    })
+  );
+
+  await menu.append(
+    await MenuItem.new({
+      text: "Edit",
+      action: () => emit("edit"),
+    })
+  );
+
+  await menu.popup();
+};
 </script>
 
 <template>
   <div ref="container">
-    <div v-if="!visible && height !== 0 && culling && !isStreaming" class="placeholder"></div>
+    <div
+      v-if="!visible && height !== 0 && culling && !isStreaming"
+      class="placeholder"
+    ></div>
     <div v-else class="item-container">
       <n-flex
         align="start"
@@ -123,7 +175,15 @@ const removeMessage = () => {
           />
         </n-avatar>
         <div class="message-bubble" :class="sender" :id="id">
-          <div class="content-container">
+          <div
+            class="content-container"
+            @contextmenu="
+              (e) => {
+                e.preventDefault();
+                showContextMenu(e);
+              }
+            "
+          >
             <div class="content">
               <MarkdownRenderer
                 :text="text"

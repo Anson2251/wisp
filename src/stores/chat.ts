@@ -33,7 +33,7 @@ export const useChatStore = defineStore('chat', () => {
 		onReceiving: (chunk: string) => void;
 		onFinish: (text: string) => void
 	}
-	const sendMessage = async (message: Omit<Message, 'id'>, {beforeSend, onReceiving, onFinish}: Partial<SendMessageCallbacks> = {}, parentMessageId = lastMessageId.value ?? undefined) => {
+	const sendMessage = async (message: Omit<Message, 'id'>, { beforeSend, onReceiving, onFinish }: Partial<SendMessageCallbacks> = {}, parentMessageId = lastMessageId.value ?? undefined): Promise<void> => {
 		const userMessageId = await addMessage(message, parentMessageId, true);
 
 		const botMessage: Omit<Message, "id"> = {
@@ -51,25 +51,30 @@ export const useChatStore = defineStore('chat', () => {
 		if (beforeSend) beforeSend(botMessageId)
 
 		let responseText = "";
-		await streamResponse(
-			displayedMessages.value.map((msg) => ({
-				role: msg.sender === "user" ? "user" : "assistant",
-				content: msg.text,
-			})),
-			(chunk) => {
-				responseText += chunk;
-				updateBubbleText(responseText);
-				if (onReceiving) onReceiving(chunk)
-			},
-			() => {
-				updateMessage(botMessageId, responseText);
-				if (onFinish) onFinish(responseText);
-			},
-			true,
-		);
+		try {
+			streamResponse(
+				displayedMessages.value.map((msg) => ({
+					role: msg.sender === "user" ? "user" : "assistant",
+					content: msg.text,
+				})),
+				(chunk) => {
+					responseText += chunk;
+					updateBubbleText(responseText);
+					if (onReceiving) onReceiving(chunk)
+				},
+				() => {
+					updateMessage(botMessageId, responseText);
+					if (onFinish) onFinish(responseText);
+				},
+				true,
+			);
+		}
+		catch (e) {
+			return Promise.reject(e)
+		}
 	}
 
-	const regenerateMessage = async (messageId: string, { beforeSend, onReceiving, onFinish }: Partial<SendMessageCallbacks>, insertGuidance = false) => {
+	const regenerateMessage = async (messageId: string, { beforeSend, onReceiving, onFinish }: Partial<SendMessageCallbacks>, insertGuidance = false): Promise<void> => {
 		const parentId = threadTree.getParentId(messageId)
 		if (!parentId) return Promise.reject("Cannot regenerate the root message");
 
@@ -88,23 +93,27 @@ export const useChatStore = defineStore('chat', () => {
 		if (beforeSend) beforeSend(botMessageId)
 
 		let responseText = "";
-		await streamResponse(
-			displayedMessages.value.map((msg) => ({
-				role: msg.sender === "user" ? "user" : "assistant",
-				content: msg.text,
-			})),
-			(chunk) => {
-				responseText += chunk;
-				updateBubbleText(responseText);
-				if (onReceiving) onReceiving(chunk)
-			},
-			() => {
-				updateMessage(botMessageId, responseText);
-				if (onFinish) onFinish(responseText);
-			},
-			true,
-			insertGuidance
-		);
+		try {
+			await streamResponse(
+				displayedMessages.value.map((msg) => ({
+					role: msg.sender === "user" ? "user" : "assistant",
+					content: msg.text,
+				})),
+				(chunk) => {
+					responseText += chunk;
+					updateBubbleText(responseText);
+					if (onReceiving) onReceiving(chunk)
+				},
+				() => {
+					updateMessage(botMessageId, responseText);
+					if (onFinish) onFinish(responseText);
+				},
+				true,
+				insertGuidance
+			);
+		} catch (e) {
+			return Promise.reject(e)
+		}
 	}
 
 	const deriveMessage = async (replacedMessageId: string, text: string, { beforeSend, onReceiving }: Partial<SendMessageCallbacks>) => {

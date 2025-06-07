@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { NInput, NButton, NEmpty, NIcon, useThemeVars } from "naive-ui";
+import { NInput, NButton, NEmpty, NIcon, useThemeVars, useMessage } from "naive-ui";
 import { Chat48Regular } from "@vicons/fluent";
 import MessageBubble from "./MessageBubble.vue";
 import AutoScrollWrapper from "./AutoScrollWrapper.vue";
@@ -16,6 +16,7 @@ provide("MarkdownRenderer", useVNodeRenderer());
 
 const chatStore = useChatStore();
 const theme = useThemeVars();
+const notificationMessage = useMessage();
 
 (window as any).chatStore = chatStore;
 
@@ -52,7 +53,7 @@ const sendMessage = () => {
     onFinish: () => {
       setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 1000);
     },
-  });
+  }).catch((e) => notificationMessage.error(e))
 };
 
 const regenerateMessage = (messageId: string, insertGuidance = false) => {
@@ -71,7 +72,7 @@ const regenerateMessage = (messageId: string, insertGuidance = false) => {
       },
     },
     insertGuidance
-  );
+  ).catch((e) => notificationMessage.error(e));
 };
 
 const resendMessage = (messageId: string, text: string, derive: boolean) => {
