@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { NInput, NButton, NEmpty, NIcon } from "naive-ui";
+import { NInput, NButton, NEmpty, NIcon, useThemeVars } from "naive-ui";
 import { Chat48Regular } from "@vicons/fluent";
 import MessageBubble from "./MessageBubble.vue";
 import AutoScrollWrapper from "./AutoScrollWrapper.vue";
@@ -15,6 +15,7 @@ provide("MermaidRenderer", useMermaid());
 provide("MarkdownRenderer", useVNodeRenderer());
 
 const chatStore = useChatStore();
+const theme = useThemeVars();
 
 (window as any).chatStore = chatStore;
 
@@ -46,12 +47,11 @@ const sendMessage = () => {
       autoScrollWrapper.value?.scrollToBottom(false);
     },
     onReceiving: () => {
-
       autoScrollWrapper.value?.scrollToBottom(false);
     },
     onFinish: () => {
       setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 1000);
-    }
+    },
   });
 };
 
@@ -68,9 +68,9 @@ const regenerateMessage = (messageId: string, insertGuidance = false) => {
       },
       onFinish: () => {
         setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 1000);
-      }
+      },
     },
-    insertGuidance,
+    insertGuidance
   );
 };
 
@@ -104,18 +104,18 @@ const allMessageBubbleReady = () => {
   console.timeEnd("[Chat] Message list loaded");
   setTimeout(() => autoScrollWrapper.value?.scrollToBottom(true, false), 300);
 };
-const bubbleReadyCount = ref(0)
+const bubbleReadyCount = ref(0);
 watch(bubbleReadyCount, () => {
   if (bubbleReadyCount.value === chatStore.displayedMessage.length) {
-    allMessageBubbleReady()
+    allMessageBubbleReady();
   }
-})
+});
 
 const loadConversationWithId = async (id?: string) => {
   if (!id) return;
 
   console.time("[Chat] Message list loaded");
-  bubbleReadyCount.value = 0
+  bubbleReadyCount.value = 0;
 
   chatStore.currentConversationId = id;
   console.log("[Chat] Current conversation id: ", id);
@@ -132,7 +132,7 @@ watch(
     } catch (error) {
       console.error("[Chat] Error loading conversation:", error);
     }
-  },
+  }
 );
 
 const showEditorModal = ref(false);
@@ -172,7 +172,7 @@ const showEditor = (messageId: string) => {
             @next="() => navigateToSibling(message.id, 1)"
             @edit="() => showEditor(message.id)"
             @regenerate="() => regenerateMessage(message.id, true)"
-            @ready="() => bubbleReadyCount += 1"
+            @ready="() => (bubbleReadyCount += 1)"
           />
         </div>
       </AutoScrollWrapper>
@@ -185,6 +185,8 @@ const showEditor = (messageId: string) => {
           </template>
         </n-empty>
       </div>
+      <div class="messages-container-shadow shadow-top"></div>
+      <div class="messages-container-shadow shadow-bottom"></div>
     </div>
 
     <div class="input-container">
@@ -232,6 +234,24 @@ const showEditor = (messageId: string) => {
 .messages-container {
   min-width: 0;
   min-height: 0;
+  position: relative;
+}
+
+.messages-container-shadow {
+  width: 100%;
+  height: 8px;
+  position: absolute;
+  --from-colour: v-bind('theme.cardColor')
+}
+
+.shadow-bottom {
+  background: linear-gradient(to bottom, transparent, var(--from-colour));
+  bottom: 0;
+}
+
+.shadow-top {
+  background: linear-gradient(to top, transparent, var(--from-colour));
+  top: 0;
 }
 
 .input-container {

@@ -63,6 +63,8 @@ const emit = defineEmits<{
   (e: "ready"): void;
 }>();
 
+const isStreaming = computed(() => chatStore.isStreaming);
+
 const container = useTemplateRef<HTMLDivElement>("container");
 const height = ref(0);
 const rendered = ref(false);
@@ -73,7 +75,7 @@ if (props.culling) {
   watch(
     [size.height, rendered, visible],
     debounce((newVal) => {
-      if (!rendered.value || chatStore.isStreaming) return;
+      if (!rendered.value || isStreaming.value) return;
       height.value = Math.round(newVal[0]);
     }, 100),
   );
@@ -104,7 +106,7 @@ const removeMessage = () => {
 
 <template>
   <div ref="container">
-    <div v-if="!visible && height !== 0 && culling && !chatStore.isStreaming" class="placeholder"></div>
+    <div v-if="!visible && height !== 0 && culling && !isStreaming" class="placeholder"></div>
     <div v-else class="item-container">
       <n-flex
         align="start"
@@ -214,6 +216,8 @@ const removeMessage = () => {
 
 .item-container {
   transform-origin: bottom 30%;
+  --property-will-change: v-bind('isStreaming ? "height" : "auto"');
+  will-change: var(--property-will-change);
   width: 100%;
   height: v-bind('(rendered || !culling ? "fit-content" : `${height}px`)');
   animation: fade-in 0.2s v-bind("theme.cubicBezierEaseIn");
@@ -221,6 +225,7 @@ const removeMessage = () => {
 
 .message-bubble {
   max-width: 80%;
+  will-change: var(--property-will-change);
   width: fit-content;
 
   display: grid;
@@ -270,6 +275,7 @@ const removeMessage = () => {
   display: flex;
   justify-content: v-bind('sender === "bot" ? "flex-start" : "flex-end"');
 
+  will-change: var(--property-will-change);
   min-width: 0;
   min-height: 0;
 }
@@ -280,6 +286,7 @@ const removeMessage = () => {
   margin-left: 12px;
   margin-right: 12px;
   transition: all 0.2s ease;
+  will-change: var(--property-will-change);
 
   background-color: v-bind("backgroundColor");
   border-radius: v-bind("theme.borderRadius");
@@ -298,6 +305,9 @@ const removeMessage = () => {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+
+  opacity: var(--footer-buttons-opacity);
+  transition: opacity 0.2s v-bind("theme.cubicBezierEaseInOut");
 }
 
 .placeholder {
@@ -321,7 +331,6 @@ const removeMessage = () => {
 
   width: fit-content;
   font-family: monospace;
-  /* opacity: var(--footer-buttons-opacity); */
   color: v-bind("theme.textColorBase");
 }
 </style>
