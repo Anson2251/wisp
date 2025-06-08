@@ -41,7 +41,7 @@ export function useVNodeRenderer() {
 			output: 'mathml'
 		},
 		value: node.value,
-		style: "font-size: 1.15em; padding: 2px;",
+		style: "font-size: 1.15em; padding: 2px; overflow: auto;",
 		inline: true
 	})
 
@@ -51,7 +51,7 @@ export function useVNodeRenderer() {
 			output: 'mathml'
 		},
 		value: node.value,
-		style: "font-size: 1.2em; padding: 4px;",
+		style: "font-size: 1.2em; padding: 4px; overflow: auto;",
 		inline: false
 	})
 

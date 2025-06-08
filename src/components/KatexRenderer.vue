@@ -13,11 +13,11 @@ const props = defineProps<{
 
 const styleLocal = computed(() => {
   if (typeof props.style === 'string') {
-    return `${props.style}; display: ${props.inline ? 'inline-block' : 'block'};`;
+    return `${props.style}; display: ${props.inline ? 'inline' : 'block'};`;
   } else {
     return {
       ...props.style,
-      display: props.inline ? 'inline-block' : 'block',
+      display: props.inline ? 'inline' : 'block',
     };
   }
 });

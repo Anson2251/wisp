@@ -1,32 +1,42 @@
 <script setup lang="ts">
-import { computedAsync } from '@vueuse/core'
-import { useVNodeRenderer } from '../composables/useMarkdown';
-import { inject } from 'vue';
+import { computedAsync } from "@vueuse/core";
+import { useVNodeRenderer } from "../composables/useMarkdown";
+import { inject } from "vue";
 
 const props = defineProps<{
-  text: string
-  mermaid?: boolean
-  over?: boolean
-}>()
+  text: string;
+  mermaid?: boolean;
+  over?: boolean;
+}>();
 
-const ready = defineModel('ready', {
+const ready = defineModel("ready", {
   default: false,
-  required: false
-})
+  required: false,
+});
 
 // VNode mode
-const VueMdastRenderer = inject('MarkdownRenderer') as ReturnType<typeof useVNodeRenderer>
+const VueMdastRenderer = inject("MarkdownRenderer") as ReturnType<
+  typeof useVNodeRenderer
+>;
 const content = computedAsync(async () => {
-  const result = await VueMdastRenderer(props.text, props.over ?? true, () => ready.value = true, (containMermaid) => ready.value = !containMermaid)
-  return result
+  const result = await VueMdastRenderer(
+    props.text,
+    props.over ?? true,
+    () => (ready.value = true),
+    (containMermaid) => (ready.value = !containMermaid)
+  );
+  return result;
 });
 </script>
 
 <template>
-  <div class="markdown-content" :style="{
-    width: '100%',
-    '--stream-fade-in': props.over ? 'fade-in 0.6s ease-in-out' : 'none',
-  }">
+  <div
+    class="markdown-content"
+    :style="{
+      width: '100%',
+      '--stream-fade-in': props.over ? 'fade-in 0.6s ease-in-out' : 'none',
+    }"
+  >
     <component :is="content" />
   </div>
 </template>
@@ -40,7 +50,6 @@ const content = computedAsync(async () => {
   to {
     opacity: 1;
   }
-
 }
 
 .markdown-content {
@@ -58,7 +67,6 @@ const content = computedAsync(async () => {
 .markdown-content:deep(*:not(strong, em)) {
   animation: var(--stream-fade-in);
 }
-
 
 .markdown-content:deep(p) {
   margin: 0.2em 0;
@@ -78,7 +86,7 @@ const content = computedAsync(async () => {
   margin-bottom: 8px;
 }
 
-.markdown-content:deep(table:deep(*))  {
+.markdown-content:deep(table:deep(*)) {
   animation: none !important;
 }
 
