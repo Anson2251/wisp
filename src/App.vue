@@ -5,6 +5,7 @@ import {
   NModalProvider,
   NMessageProvider,
   NIcon,
+  NGlobalStyle,
   useOsTheme,
   darkTheme,
   lightTheme,
@@ -26,13 +27,13 @@ const osThemeRef = useOsTheme();
 const isDark = computed(() => osThemeRef.value === "dark");
 const theme = computed(() => (isDark.value ? darkTheme : lightTheme));
 
-import {useMermaid} from "./composables/useMermaid";
+import { useMermaid } from "./composables/useMermaid";
 provide("MermaidRenderer", useMermaid());
 
-import {useVNodeRenderer} from "./composables/useMarkdown";
+import { useVNodeRenderer } from "./composables/useMarkdown";
 provide("MarkdownRenderer", useVNodeRenderer());
 
-import { useChatStore } from "./stores/chat"
+import { useChatStore } from "./stores/chat";
 provide("ChatStore", useChatStore());
 </script>
 
@@ -45,33 +46,34 @@ provide("ChatStore", useChatStore());
             <div class="sidebar">
               <router-link to="/chat" active-class="sidebar-item-active">
                 <div class="sidebar-item">
-                  <n-icon size="24"
-                    ><ChatMultiple24Regular
-                  /></n-icon>
+                  <n-icon size="24"><ChatMultiple24Regular /></n-icon>
                 </div>
               </router-link>
               <router-link to="/pals" active-class="sidebar-item-active">
                 <div class="sidebar-item">
-                  <n-icon size="24"
-                    ><Bot24Regular
-                  /></n-icon>
+                  <n-icon size="24"><Bot24Regular /></n-icon>
                 </div>
               </router-link>
               <router-link to="/providers" active-class="sidebar-item-active">
                 <div class="sidebar-item">
-                  <n-icon size="24"
-                    ><Cube24Regular
-                  /></n-icon>
+                  <n-icon size="24"><Cube24Regular /></n-icon>
                 </div>
               </router-link>
             </div>
             <div class="main-content">
-              <KeepAlive><router-view /></KeepAlive>
+              <router-view v-slot="{ Component, route }">
+                <transition name="fade">
+                  <keep-alive>
+                    <component :is="Component" :key="route.path"/>
+                  </keep-alive>
+                </transition>
+              </router-view>
             </div>
           </div>
         </n-message-provider>
       </n-modal-provider>
     </n-dialog-provider>
+    <n-global-style />
   </n-config-provider>
 </template>
 
@@ -96,10 +98,21 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  background-color: transparent !important;
 }
 </style>
 
 <style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease-in-out;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
 .container {
   position: fixed;
   top: 0;
@@ -127,7 +140,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: v-bind('theme.common.textColor3');
+  color: v-bind("theme.common.textColor3");
 
   height: 48px;
   width: 48px;
@@ -140,7 +153,7 @@ body {
 }
 
 .sidebar-item-active svg {
-  color: v-bind('theme.common.textColor1');
+  color: v-bind("theme.common.textColor1");
 }
 
 .main-content {

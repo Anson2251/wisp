@@ -292,11 +292,11 @@ const showContextMenu = async (e: MouseEvent) => {
   grid-template-columns: auto;
   grid-template-rows: auto, auto;
 
-  --footer-buttons-opacity: 0;
+  --footer-buttons-visible: hidden;
 }
 
 .message-bubble:hover {
-  --footer-buttons-opacity: 1;
+  --footer-buttons-visible: auto;
 }
 
 .message-bubble.user {
@@ -366,8 +366,8 @@ const showContextMenu = async (e: MouseEvent) => {
   align-items: center;
   gap: 8px;
 
-  opacity: var(--footer-buttons-opacity);
-  transition: opacity 0.2s v-bind("theme.cubicBezierEaseInOut");
+
+  visibility: var(--footer-buttons-visible);
 }
 
 .placeholder {
@@ -376,13 +376,6 @@ const showContextMenu = async (e: MouseEvent) => {
 
   width: 100%;
   height: v-bind("`${height}px`");
-}
-
-/** I don't know why the timestamp doesn't disappear in Safari once it appears */
-.footer:deep(*) {
-  /* Work around for Safari bug */
-  opacity: var(--footer-buttons-opacity);
-  transition: opacity 0.2s v-bind("theme.cubicBezierEaseInOut");
 }
 
 .timestamp {

@@ -83,6 +83,7 @@ const resendMessageLocal = (text: string) => {
 </script>
 
 <template>
+  <transition name="fade">
   <window v-if="show" @close="closeEditor" title="Message Editor">
     <template #default>
       <div class="editor-container">
@@ -102,9 +103,20 @@ const resendMessageLocal = (text: string) => {
       </div>
     </template>
   </window>
+  </transition>
 </template>
 
 <style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease-in-out;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
 .editor-container {
   display: flex;
   flex-direction: column;

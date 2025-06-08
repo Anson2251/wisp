@@ -262,21 +262,8 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@keyframes fade-in {
-  from {
-    opacity: 0.6;
-    transform: scale(0.8);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
 .window {
   position: fixed;
-  animation: fade-in 0.1s v-bind('themeVars.cubicBezierEaseIn');
   background-color: v-bind('themeVars.cardColor');
   color: v-bind('themeVars.textColor1');
   border-radius: v-bind('isMaximized ? 0 : themeVars.borderRadius');
