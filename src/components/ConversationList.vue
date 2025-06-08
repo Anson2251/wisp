@@ -11,27 +11,18 @@ const theme = useThemeVars();
 const message = useMessage();
 const dialog = useDialog();
 const chatStore = useChatStore();
-const conversations = chatStore.conversations;
-const selectedId = ref<string>();
-
-chatStore.listConversations();
 
 // Info dialog state
 const showInfoDialog = ref(false);
 const activeConversation = ref<any>(null);
 
-onMounted(async () => {
-  if (conversations.length > 0) {
-    selectedId.value = conversations[0].id;
-  }
-});
+onMounted(chatStore.listConversations);
 
 const emit = defineEmits<{
   (e: "select", id: string): void;
 }>();
 
 const handleSelect = (id: string) => {
-  selectedId.value = id;
   emit("select", id);
 };
 
@@ -56,7 +47,6 @@ const confirmDeletion = () => {
 
 const handleNewConversation = async () => {
   const newId = await chatStore.createConversation("New Conversation", "");
-  selectedId.value = newId;
   emit("select", newId);
 };
 
@@ -65,12 +55,6 @@ const handleDeleteConversation = async (id: string) => {
   if (!confirmed) return;
   try {
     await chatStore.deleteConversation(id);
-    if (selectedId.value === id && conversations.length > 0) {
-      selectedId.value = conversations[0].id;
-      emit("select", selectedId.value);
-    } else if (conversations.length === 0) {
-      selectedId.value = undefined;
-    }
   } catch (e) {
     message.error(e as string);
   }
@@ -110,7 +94,7 @@ const showContextMenu = async (e: MouseEvent, conversation: any) => {
           v-for="conv in chatStore.conversations"
           :class="[
             'conversation-item',
-            ...(selectedId === conv.id ? ['selected'] : []),
+            ...(chatStore.currentConversationId === conv.id ? ['selected'] : []),
           ]"
           :key="conv.id"
           @click="handleSelect(conv.id)"

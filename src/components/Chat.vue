@@ -1,24 +1,24 @@
 <script lang="ts" setup>
-import { NInput, NButton, NEmpty, NIcon, useThemeVars, useMessage } from "naive-ui";
+import {
+  NInput,
+  NButton,
+  NEmpty,
+  NIcon,
+  useThemeVars,
+  useMessage,
+} from "naive-ui";
 import { Chat48Regular } from "@vicons/fluent";
 import MessageBubble from "./MessageBubble.vue";
 import AutoScrollWrapper from "./AutoScrollWrapper.vue";
-import { useChatStore } from "../stores/chat";
-import { ref, provide, watch } from "vue";
+import { ref, inject, watch, onMounted } from "vue";
 import { Message, MessageRole } from "../libs/types";
 import MessageBubbleEditor from "./MessageBubbleEditor.vue";
+import { useChatStore } from "../stores/chat";
 
-import { useMermaid } from "../composables/useMermaid";
-import { useVNodeRenderer } from "../composables/useMarkdown";
-
-provide("MermaidRenderer", useMermaid());
-provide("MarkdownRenderer", useVNodeRenderer());
-
-const chatStore = useChatStore();
 const theme = useThemeVars();
 const notificationMessage = useMessage();
 
-(window as any).chatStore = chatStore;
+const chatStore = inject("ChatStore") as ReturnType<typeof useChatStore>;
 
 const autoScrollWrapper = ref<typeof AutoScrollWrapper | null>(null);
 
@@ -42,24 +42,8 @@ const sendMessage = () => {
     sender: MessageRole.User,
     timestamp: Math.round(new Date().getTime() / 1000),
   };
-  chatStore.sendMessage(userMessage, {
-    beforeSend: () => {
-      chatStore.clearUserInput();
-      autoScrollWrapper.value?.scrollToBottom(false);
-    },
-    onReceiving: () => {
-      autoScrollWrapper.value?.scrollToBottom(false);
-    },
-    onFinish: () => {
-      setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 1000);
-    },
-  }).catch((e) => notificationMessage.error(e))
-};
-
-const regenerateMessage = (messageId: string, insertGuidance = false) => {
-  chatStore.regenerateMessage(
-    messageId,
-    {
+  chatStore
+    .sendMessage(userMessage, {
       beforeSend: () => {
         chatStore.clearUserInput();
         autoScrollWrapper.value?.scrollToBottom(false);
@@ -70,9 +54,32 @@ const regenerateMessage = (messageId: string, insertGuidance = false) => {
       onFinish: () => {
         setTimeout(() => autoScrollWrapper.value?.scrollToBottom(false), 1000);
       },
-    },
-    insertGuidance
-  ).catch((e) => notificationMessage.error(e));
+    })
+    .catch((e) => notificationMessage.error(e));
+};
+
+const regenerateMessage = (messageId: string, insertGuidance = false) => {
+  chatStore
+    .regenerateMessage(
+      messageId,
+      {
+        beforeSend: () => {
+          chatStore.clearUserInput();
+          autoScrollWrapper.value?.scrollToBottom(false);
+        },
+        onReceiving: () => {
+          autoScrollWrapper.value?.scrollToBottom(false);
+        },
+        onFinish: () => {
+          setTimeout(
+            () => autoScrollWrapper.value?.scrollToBottom(false),
+            1000
+          );
+        },
+      },
+      insertGuidance
+    )
+    .catch((e) => notificationMessage.error(e));
 };
 
 const resendMessage = (messageId: string, text: string, derive: boolean) => {
@@ -124,18 +131,6 @@ const loadConversationWithId = async (id?: string) => {
   await chatStore.loadConversation(id);
 };
 
-watch(
-  () => props.conversationId,
-  async (newId) => {
-    try {
-      console.log("[Chat] Watching conversation id change:", newId);
-      await loadConversationWithId(newId);
-    } catch (error) {
-      console.error("[Chat] Error loading conversation:", error);
-    }
-  }
-);
-
 const showEditorModal = ref(false);
 const messageEditingId = ref<string | null>(null);
 
@@ -143,63 +138,85 @@ const showEditor = (messageId: string) => {
   messageEditingId.value = messageId;
   showEditorModal.value = true;
 };
+
+onMounted(() => {
+  watch(
+    () => props.conversationId,
+    async (newId) => {
+      try {
+        console.log("[Chat] Watching conversation id change:", newId);
+        await loadConversationWithId(newId);
+      } catch (error) {
+        console.error("[Chat] Error loading conversation:", error);
+      }
+    }
+  );
+});
 </script>
 
 <template>
-  <div v-if="chatStore.currentConversationId" class="chat-container">
-    <div class="messages-container">
-      <AutoScrollWrapper
-        v-if="chatStore.displayedMessage.length > 0"
-        ref="autoScrollWrapper"
-        :auto="true"
-        :smooth="true"
-      >
-        <div class="bubble-container">
-          <MessageBubble
-            v-for="(message, index) in chatStore.displayedMessage"
-            :key="message.id"
-            :text="message.text"
-            :sender="message.sender"
-            :timestamp="new Date(message.timestamp * 1000)"
-            :id="message.id"
-            :over="
-              index === chatStore.displayedMessage.length - 1 &&
-              !chatStore.isStreaming
-            "
-            :hasPrevious="message.hasPrevious"
-            :hasNext="message.hasNext"
-            :culling="useBubbleCulling"
-            @previous="() => navigateToSibling(message.id, -1)"
-            @next="() => navigateToSibling(message.id, 1)"
-            @edit="() => showEditor(message.id)"
-            @regenerate="() => regenerateMessage(message.id, true)"
-            @ready="() => (bubbleReadyCount += 1)"
-          />
+  <div style="height: 100%; width: 100%">
+    <div v-if="chatStore.currentConversationId" class="chat-container">
+      <div class="messages-container">
+        <AutoScrollWrapper
+          v-if="chatStore.displayedMessage.length > 0"
+          ref="autoScrollWrapper"
+          :auto="true"
+          :smooth="true"
+        >
+          <div class="bubble-container">
+            <MessageBubble
+              v-for="(message, index) in chatStore.displayedMessage"
+              :key="message.id"
+              :text="message.text"
+              :sender="message.sender"
+              :timestamp="new Date(message.timestamp * 1000)"
+              :id="message.id"
+              :over="
+                index === chatStore.displayedMessage.length - 1 &&
+                !chatStore.isStreaming
+              "
+              :hasPrevious="message.hasPrevious"
+              :hasNext="message.hasNext"
+              :culling="useBubbleCulling"
+              @previous="() => navigateToSibling(message.id, -1)"
+              @next="() => navigateToSibling(message.id, 1)"
+              @edit="() => showEditor(message.id)"
+              @regenerate="() => regenerateMessage(message.id, true)"
+              @ready="() => (bubbleReadyCount += 1)"
+            />
+          </div>
+        </AutoScrollWrapper>
+        <div v-else class="placeholder-container">
+          <n-empty description="Let's chatting!">
+            <template #icon>
+              <n-icon :size="48">
+                <Chat48Regular />
+              </n-icon>
+            </template>
+          </n-empty>
         </div>
-      </AutoScrollWrapper>
-      <div v-else class="placeholder-container">
-        <n-empty description="Let's chatting!">
-          <template #icon>
-            <n-icon :size="48">
-              <Chat48Regular />
-            </n-icon>
-          </template>
-        </n-empty>
+        <div class="messages-container-shadow shadow-top"></div>
+        <div class="messages-container-shadow shadow-bottom"></div>
       </div>
-      <div class="messages-container-shadow shadow-top"></div>
-      <div class="messages-container-shadow shadow-bottom"></div>
-    </div>
 
-    <div class="input-container">
-      <n-input
-        v-model:value="chatStore.userInput"
-        placeholder="Type your message..."
-        @keyup.enter="sendMessage"
-        clearable
-        round
-        type="textarea"
+      <div class="input-container">
+        <n-input
+          v-model:value="chatStore.userInput"
+          placeholder="Type your message..."
+          @keyup.enter="sendMessage"
+          clearable
+          round
+          type="textarea"
+        />
+        <n-button type="primary" @click="sendMessage" round>Send</n-button>
+      </div>
+    </div>
+    <div v-else class="placeholder-container">
+      <n-empty
+        :show-icon="false"
+        description="Select a conversation to start"
       />
-      <n-button type="primary" @click="sendMessage" round>Send</n-button>
     </div>
     <MessageBubbleEditor
       v-model:show="showEditorModal"
@@ -212,9 +229,6 @@ const showEditor = (messageId: string) => {
         }
       "
     />
-  </div>
-  <div v-else class="placeholder-container">
-    <n-empty :show-icon="false" description="Select a conversation to start" />
   </div>
 </template>
 
@@ -242,7 +256,7 @@ const showEditor = (messageId: string) => {
   width: 100%;
   height: 8px;
   position: absolute;
-  --from-colour: v-bind('theme.cardColor')
+  --from-colour: v-bind("theme.cardColor");
 }
 
 .shadow-bottom {

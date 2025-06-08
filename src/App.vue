@@ -20,13 +20,20 @@ import useHighlightjs from "./composables/useHighlightjs";
 const hljs = useHighlightjs();
 
 import { useOpenAI } from "./composables/useOpenAI";
-const openai = useOpenAI();
-
-provide("OpenAI", openai);
+provide("OpenAI", useOpenAI());
 
 const osThemeRef = useOsTheme();
 const isDark = computed(() => osThemeRef.value === "dark");
 const theme = computed(() => (isDark.value ? darkTheme : lightTheme));
+
+import {useMermaid} from "./composables/useMermaid";
+provide("MermaidRenderer", useMermaid());
+
+import {useVNodeRenderer} from "./composables/useMarkdown";
+provide("MarkdownRenderer", useVNodeRenderer());
+
+import { useChatStore } from "./stores/chat"
+provide("ChatStore", useChatStore());
 </script>
 
 <template>
