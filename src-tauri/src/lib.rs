@@ -4,9 +4,11 @@ mod commands;
 mod db;
 mod utils;
 mod inet;
+mod key_manager;
 use tauri::{Builder, Manager};
 use db::chat::Chat;
 use cache::DiagramCache;
+use key_manager::KeyManager;
 use std::sync::Mutex;
 mod types;
 use types::AppData;
@@ -25,6 +27,7 @@ pub fn run() {
 			app.manage(Mutex::new(AppData {
 				chat: Chat::new(app.handle())?,
 				diagram_cache: DiagramCache::new()?,
+				key_manager: KeyManager::new("wisp".to_string()),
 			}));
 			Ok(())
 		})
@@ -50,6 +53,9 @@ pub fn run() {
 			commands::update_conversation,
 			commands::get_url,
 			commands::post_url,
+            commands::set_api_key,
+            commands::get_api_key,
+            commands::delete_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

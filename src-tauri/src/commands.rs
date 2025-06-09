@@ -64,6 +64,38 @@ pub async fn post_url(
     client.post(url, body, headers, parse_json).await
 }
 
+// API Key Management
+#[tauri::command]
+pub fn set_api_key(
+    app_handle: AppHandle,
+	name: String,
+    key: String
+) -> Result<(), String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+    state.key_manager.set_api_key(&name, &key)
+}
+
+#[tauri::command]
+pub fn get_api_key(
+    app_handle: AppHandle,
+	name: String
+) -> Result<String, String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+    state.key_manager.get_api_key(&name)
+}
+
+#[tauri::command]
+pub fn delete_api_key(
+    app_handle: AppHandle,
+    name: String
+) -> Result<(), String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+	let state = state.lock().unwrap();
+    state.key_manager.delete_api_key(&name)
+}
+
 // OpenAI integration
 #[tauri::command]
 pub async fn ask_openai_stream(app_handle: AppHandle, messages: Vec<Value>) -> Result<(), String> {
