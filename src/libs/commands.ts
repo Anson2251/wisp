@@ -18,17 +18,18 @@ export async function createConversation(name: string, description?: string): Pr
 	});
 }
 
-export async function addMessage(conversationId: string, text: string, sender: string, parentId?: string): Promise<string> {
+export async function addMessage(conversationId: string, text: string, sender: string, reasoning?: string, parentId?: string): Promise<string> {
+	console.log(reasoning)
 	return new Promise((resolve, reject) => {
-		invoke('add_message', { conversationId, text, sender, parentId })
+		invoke('add_message', { conversationId, text, reasoning, sender, parentId })
 			.then((messageId) => resolve(messageId as string))
 			.catch((error: any) => reject(error));
 	});
 }
 
-export async function updateMessage(messageId: string, text: string): Promise<void> {
+export async function updateMessage(messageId: string, text: string, reasoning?: string): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
-		invoke('update_message', { messageId, text })
+		invoke('update_message', { messageId, text, reasoning })
 			.then(() => resolve())
 			.catch((error: any) => reject(error));
 	});
@@ -126,9 +127,36 @@ export async function putCachedDiagram(hash: string, entry: DiagramCacheEntry): 
 }
 
 export async function clearDiagramCache(): Promise<void> {
-	return new Promise((resolve, reject) => {
-		invoke('clear_diagram_cache', {})
-			.then(() => resolve())
-			.catch((error: any) => reject(error));
-	});
+    return new Promise((resolve, reject) => {
+        invoke('clear_diagram_cache', {})
+            .then(() => resolve())
+            .catch((error: any) => reject(error));
+    });
+}
+
+export interface HttpRequest {
+  url: string;
+  headers?: Record<string, string>;
+  parseJson?: boolean;
+}
+
+export interface PostRequest extends HttpRequest {
+  body: string;
+}
+
+export async function getUrl(request: HttpRequest): Promise<any> {
+  return invoke('get_url', {
+    url: request.url,
+    headers: request.headers,
+    parseJson: request.parseJson ?? false
+  });
+}
+
+export async function postUrl(request: PostRequest): Promise<any> {
+  return invoke('post_url', {
+    url: request.url,
+    body: request.body,
+    headers: request.headers,
+    parseJson: request.parseJson ?? false
+  });
 }

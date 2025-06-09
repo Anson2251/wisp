@@ -5,6 +5,8 @@ import {
   NButton,
   NFlex,
   NButtonGroup,
+  NCollapse,
+  NCollapseItem,
   useDialog,
   useThemeVars,
 } from "naive-ui";
@@ -46,6 +48,7 @@ const border = computed(() => `1px solid ${borderColor.value}`);
 
 const props = defineProps<{
   text: string;
+  reasoning?: string;
   sender: MessageRole;
   timestamp: Date;
   id: string;
@@ -151,6 +154,10 @@ const showContextMenu = async (e: MouseEvent) => {
 
   await menu.popup();
 };
+
+const onReadyStatusChange = (ready: boolean) => {
+  if (ready) emit("ready");
+};
 </script>
 
 <template>
@@ -163,13 +170,9 @@ const showContextMenu = async (e: MouseEvent) => {
       <n-flex
         align="start"
         :wrap="false"
-        :style="{
-          flexDirection: sender === 'user' ? 'row-reverse' : 'row',
-          alignItems: 'flex-start',
-          marginBottom: '12px',
-        }"
+        class="item-layout"
       >
-        <n-avatar style="position: sticky; top: 8px">
+        <n-avatar class="avatar">
           <n-icon
             :component="sender === 'bot' ? Chat24Regular : Person24Regular"
           />
@@ -185,15 +188,26 @@ const showContextMenu = async (e: MouseEvent) => {
             "
           >
             <div class="content">
+              <div v-if="reasoning" class="reasoning-container">
+                <n-collapse
+                  arrow-placement="right"
+                  display-directive="show"
+                  :default-expanded-names="isStreaming ? 'thinking' : undefined"
+                >
+                  <n-collapse-item title="Thinking" name="thinking">
+                    <MarkdownRenderer
+                      :text="reasoning"
+                      :over="over"
+                      v-model:ready="rendered"
+                    />
+                  </n-collapse-item>
+                </n-collapse>
+              </div>
               <MarkdownRenderer
                 :text="text"
                 :over="over"
                 v-model:ready="rendered"
-                @update:ready="
-                  (ready) => {
-                    if (ready) emit('ready');
-                  }
-                "
+                @update:ready="onReadyStatusChange"
               />
             </div>
           </div>
@@ -283,6 +297,18 @@ const showContextMenu = async (e: MouseEvent) => {
   animation: fade-in 0.2s v-bind("theme.cubicBezierEaseIn");
 }
 
+.item-layout {
+  flex-direction: v-bind('sender === "user" ? "row-reverse" : "row"') !important;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.avatar {
+  position: sticky;
+  top: 8px;
+  box-shadow: v-bind("theme.boxShadow2");
+}
+
 .message-bubble {
   max-width: 80%;
   will-change: var(--property-will-change);
@@ -354,6 +380,19 @@ const showContextMenu = async (e: MouseEvent) => {
   border: v-bind("border");
 
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reasoning-container {
+  width: 100%;
+  background-color: rgba(128, 128, 128, 0.2);
+  padding: 8px 12px;
+  box-sizing: border-box;
+  border-radius: v-bind("theme.borderRadiusSmall");
+  border: 1px solid v-bind("theme.borderColor");
+  box-shadow: v-bind("theme.boxShadow3");
 }
 
 .footer {
@@ -365,7 +404,6 @@ const showContextMenu = async (e: MouseEvent) => {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-
 
   visibility: var(--footer-buttons-visible);
 }

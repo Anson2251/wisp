@@ -39,6 +39,7 @@ provide("ChatStore", useChatStore());
 
 <template>
   <n-config-provider :katex="(katex as any)" :hljs="hljs" :theme="theme">
+    <n-global-style />
     <n-dialog-provider>
       <n-modal-provider>
         <n-message-provider>
@@ -73,7 +74,6 @@ provide("ChatStore", useChatStore());
         </n-message-provider>
       </n-modal-provider>
     </n-dialog-provider>
-    <n-global-style />
   </n-config-provider>
 </template>
 

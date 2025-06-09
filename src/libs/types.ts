@@ -7,6 +7,7 @@ export enum MessageRole {
 export type Message = {
 	id: string,
 	text: string,
+	reasoning?: string,
 	sender: MessageRole,
 	timestamp: number,
 	tokens?: number,

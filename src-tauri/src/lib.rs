@@ -3,6 +3,7 @@ mod cache;
 mod commands;
 mod db;
 mod utils;
+mod inet;
 use tauri::{Builder, Manager};
 use db::chat::Chat;
 use cache::DiagramCache;
@@ -47,6 +48,8 @@ pub fn run() {
             commands::list_conversations,
 			commands::update_conversation_entry_id,
 			commands::update_conversation,
+			commands::get_url,
+			commands::post_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

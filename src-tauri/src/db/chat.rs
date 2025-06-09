@@ -61,6 +61,7 @@ impl Chat {
         conversation_id: &str,
         message_id: &str,
         text: &str,
+		reasoning: Option<&str>,
         sender: &str,
         parent_message_id: Option<&str>,
     ) -> Result<(), ChatError> {
@@ -69,7 +70,7 @@ impl Chat {
 
         // Add the message
         self.messages_manager
-            .add(message_id, text, sender, None, None)?;
+            .add(message_id, text, reasoning, sender, None, None)?;
 
         // Link to parent message
         self.thread_manager.add(message_id, parent_message_id)?;
@@ -139,18 +140,18 @@ impl Chat {
         let mut conn = self.pool.get()?;
         let tx = conn.transaction()?;
 
-        // Delete conversation
-        self.conversation_manager.delete(conversation_id)?;
-
         let messages = self.get_all_message_involved(conversation_id);
         match messages {
             Ok(messages) => {
                 for message in messages {
                     self.messages_manager.delete(&message.id)?;
+					self.thread_manager.delete_with_parent(&message.id)?;
                 }
             }
             Err(_) => {}
         }
+
+		self.conversation_manager.delete(conversation_id)?;
 
         tx.commit()?;
         Ok(())

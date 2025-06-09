@@ -9,14 +9,19 @@ export function useOpenAI() {
 
 	const streamResponse = async (
 		messages: any[],
-		onChunk: (chunk: string) => void,
+		onContentChunk: (chunk: string) => void,
+		onReasoningChunk: (chunk: string) => void,
 		onFinish: () => void,
 		ignoreLastMessage: boolean = false,
 		insertRegenerateGuidancePrompt: boolean = false,
 	): Promise<void> => {
 		isStreaming.value = true
-		const unlisten = await listen<string>('openai_stream_chunk', (event) => {
-			onChunk(event.payload)
+		const unlistenContent = await listen<string>('openai_stream_chunk', (event) => {
+			onContentChunk(event.payload)
+		})
+
+		const unlistenReasoning = await listen<string>('openai_stream_chunk_reasoning', (event) => {
+			onReasoningChunk(event.payload)
 		})
 
 		try {
@@ -33,7 +38,8 @@ export function useOpenAI() {
 			return Promise.reject("Fail to stream response: " + error)
 		}
 		 finally {
-			unlisten()
+			unlistenContent()
+			unlistenReasoning()
 			isStreaming.value = false
 			if(onFinish) onFinish()
 		}

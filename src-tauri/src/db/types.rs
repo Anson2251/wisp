@@ -103,6 +103,7 @@ impl TryFrom<String> for MessageRole {
 pub struct Message {
     pub id: String,
     pub text: String,
+	pub reasoning: Option<String>,
     pub sender: MessageRole,
     pub timestamp: i64,
     #[serde(skip_serializing_if = "Option::is_none")]

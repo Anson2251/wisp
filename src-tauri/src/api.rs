@@ -16,7 +16,7 @@ use serde_json::Value;
 use tauri::{AppHandle, Emitter};
 
 const URL_BASE: &str = "https://api.siliconflow.cn/v1/";
-const MODEL: &str = "THUDM/GLM-4-9B-0414";
+const MODEL: &str = "Qwen/Qwen3-8B";
 
 /// Creates a configured OpenAI client for SiliconFlow API
 fn get_siliconflow_client() -> Result<Client<OpenAIConfig>, Box<dyn Error>> {
@@ -91,6 +91,11 @@ pub async fn ask_openai_stream(
                     if let Some(content) = choice.delta.content {
                         app_handle
                             .emit("openai_stream_chunk", content)
+                            .map_err(|e| e.to_string())?;
+                    }
+					if let Some(reasoning_content) = choice.delta.reasoning_content {
+                        app_handle
+                            .emit("openai_stream_chunk_reasoning", reasoning_content)
                             .map_err(|e| e.to_string())?;
                     }
                 }

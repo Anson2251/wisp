@@ -1,9 +1,11 @@
 use std::sync::Mutex;
+use std::collections::HashMap;
 
 use crate::{
     cache::DiagramCacheEntry,
     db::types::{Conversation, Message, ThreadTreeItem},
     utils::compute_content_hash,
+    inet::HttpClient,
 };
 use serde_json::Value;
 use tauri::{AppHandle, Manager};
@@ -41,6 +43,27 @@ pub async fn clear_diagram_cache(app_handle: AppHandle) {
     state.diagram_cache.clear();
 }
 
+#[tauri::command]
+pub async fn get_url(
+    url: String,
+    headers: Option<HashMap<String, String>>,
+    parse_json: bool
+) -> Result<serde_json::Value, String> {
+    let client = HttpClient::new();
+    client.get(url, headers, parse_json).await
+}
+
+#[tauri::command]
+pub async fn post_url(
+    url: String,
+    body: String,
+    headers: Option<HashMap<String, String>>,
+    parse_json: bool
+) -> Result<serde_json::Value, String> {
+    let client = HttpClient::new();
+    client.post(url, body, headers, parse_json).await
+}
+
 // OpenAI integration
 #[tauri::command]
 pub async fn ask_openai_stream(app_handle: AppHandle, messages: Vec<Value>) -> Result<(), String> {
@@ -70,6 +93,7 @@ pub async fn add_message(
     app_handle: AppHandle,
     conversation_id: String,
     text: String,
+	reasoning: Option<String>,
     sender: String,
     parent_id: Option<String>,
 ) -> Result<String, String> {
@@ -83,6 +107,7 @@ pub async fn add_message(
             &conversation_id,
             &message_id,
             &text,
+			reasoning.as_deref(),
             &sender,
             parent_id.as_deref(),
         )
@@ -95,13 +120,18 @@ pub async fn update_message(
     app_handle: AppHandle,
     message_id: String,
     text: String,
+	reasoning: Option<String>,
 ) -> Result<(), String> {
     let state = app_handle.state::<Mutex<AppData>>();
     let mut state = state.lock().unwrap();
     state
         .chat
         .update_message(&message_id, &text)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+	if let Some(reasoning) = reasoning {
+        let _ = state.chat.messages_manager.update_reasoning(&message_id, &reasoning);
+	}
+	Ok(())
 }
 
 #[tauri::command]

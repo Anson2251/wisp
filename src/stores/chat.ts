@@ -7,11 +7,12 @@ import { MessageRole } from '../libs/types';
 import debounce from "lodash/debounce";
 import { useOpenAI } from '../composables/useOpenAI'
 
-type MessageDisplay = Omit<Message, 'text'> & {
+type MessageDisplay = Omit<Omit<Message, 'text'>, 'reasoning'> & {
 	over: boolean,
 	hasPrevious: boolean,
 	hasNext: boolean,
-	text: ComputedRef<string>
+	text: ComputedRef<string>,
+	reasoning: ComputedRef<string>,
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -30,8 +31,8 @@ export const useChatStore = defineStore('chat', () => {
 
 	type SendMessageCallbacks = {
 		beforeSend: (botMessageId: string) => void;
-		onReceiving: (chunk: string) => void;
-		onFinish: (text: string) => void
+		onReceiving: (chunk: string, isReasoning: boolean) => void;
+		onFinish: (text: string, reasoning?: string) => void
 	}
 	const sendMessage = async (message: Omit<Message, 'id'>, { beforeSend, onReceiving, onFinish }: Partial<SendMessageCallbacks> = {}, parentMessageId = lastMessageId.value ?? undefined): Promise<void> => {
 		const userMessageId = await addMessage(message, parentMessageId, true);
@@ -43,14 +44,18 @@ export const useChatStore = defineStore('chat', () => {
 		};
 		const botMessageId = await addMessage(botMessage, userMessageId, true);
 
-		const updateMessageLocal = (text: string) => {
+		const updateMessageLocal = (text: string, isReasoning: boolean) => {
 			const message = messages.value.get(botMessageId);
-			if (message) messages.value.set(botMessageId, { ...message, text });
+			if (message) {
+				if (!isReasoning) messages.value.set(botMessageId, { ...message, text });
+				else messages.value.set(botMessageId, { ...message, reasoning: text });
+			}
 		};
 		const updateBubbleText = debounce(updateMessageLocal, 10);
 		if (beforeSend) beforeSend(botMessageId)
 
 		let responseText = "";
+		let reasoningText = "";
 		try {
 			streamResponse(
 				displayedMessages.value.map((msg) => ({
@@ -59,12 +64,17 @@ export const useChatStore = defineStore('chat', () => {
 				})),
 				(chunk) => {
 					responseText += chunk;
-					updateBubbleText(responseText);
-					if (onReceiving) onReceiving(chunk)
+					updateBubbleText(responseText, false);
+					if (onReceiving) onReceiving(chunk, false)
+				},
+				(chunk) => {
+					reasoningText += chunk;
+					updateBubbleText(reasoningText, true);
+					if (onReceiving) onReceiving(chunk, true)
 				},
 				() => {
-					updateMessage(botMessageId, responseText);
-					if (onFinish) onFinish(responseText);
+					updateMessage(botMessageId, responseText, reasoningText);
+					if (onFinish) onFinish(responseText, !!reasoningText ? reasoningText : undefined);
 				},
 				true,
 			);
@@ -80,38 +90,49 @@ export const useChatStore = defineStore('chat', () => {
 
 		const botMessage: Omit<Message, "id"> = {
 			text: "",
+			reasoning: "",
 			sender: MessageRole.Assistant,
 			timestamp: Math.round(new Date().getTime() / 1000),
 		};
 		const botMessageId = await addMessage(botMessage, parentId, true);
 
-		const updateMessageLocal = (text: string) => {
+		const updateMessageLocal = (text: string, isReasoning: boolean) => {
 			const message = messages.value.get(botMessageId);
-			if (message) messages.value.set(botMessageId, { ...message, text });
+			if (message) {
+				if (!isReasoning) messages.value.set(botMessageId, { ...message, text });
+				else messages.value.set(botMessageId, { ...message, reasoning: text });
+			}
 		};
 		const updateBubbleText = debounce(updateMessageLocal, 10);
 		if (beforeSend) beforeSend(botMessageId)
 
 		let responseText = "";
+		let reasoningText = "";
 		try {
-			await streamResponse(
+			streamResponse(
 				displayedMessages.value.map((msg) => ({
 					role: msg.sender === "user" ? "user" : "assistant",
 					content: msg.text,
 				})),
 				(chunk) => {
 					responseText += chunk;
-					updateBubbleText(responseText);
-					if (onReceiving) onReceiving(chunk)
+					updateBubbleText(responseText, false);
+					if (onReceiving) onReceiving(chunk, false)
+				},
+				(chunk) => {
+					reasoningText += chunk;
+					updateBubbleText(reasoningText, true);
+					if (onReceiving) onReceiving(chunk, true)
 				},
 				() => {
-					updateMessage(botMessageId, responseText);
-					if (onFinish) onFinish(responseText);
+					updateMessage(botMessageId, responseText, reasoningText);
+					if (onFinish) onFinish(responseText, !!reasoningText ? reasoningText : undefined);
 				},
 				true,
 				insertGuidance
 			);
-		} catch (e) {
+		}
+		catch (e) {
 			return Promise.reject(e)
 		}
 	}
@@ -192,6 +213,7 @@ export const useChatStore = defineStore('chat', () => {
 			return {
 				...message,
 				text: computed(() => messages.value.get(id)!.text ?? ''),
+				reasoning: computed(() => messages.value.get(id)!.reasoning ?? ''),
 				over: true,
 				hasNext: hasNext,
 				hasPrevious: hasPrevious,
@@ -317,7 +339,7 @@ export const useChatStore = defineStore('chat', () => {
 				console.error('[ChatStore] No conversation selected')
 				return
 			}
-			Commands.addMessage(conversationId, message.text, message.sender, parentId)
+			Commands.addMessage(conversationId, message.text, message.sender, message.reasoning, parentId)
 				.then(async (id) => {
 					messages.value.set(id, { ...message, id })
 					threadTree.addNode(id, parentId)
@@ -393,12 +415,15 @@ export const useChatStore = defineStore('chat', () => {
 		})
 	}
 
-	const updateMessage = (id: string, text: string) => {
+	const updateMessage = (id: string, text: string, reasoning?: string) => {
 		return new Promise<void>((resolve, reject) => {
-			Commands.updateMessage(id, text)
+			Commands.updateMessage(id, text, reasoning)
 				.then(() => {
 					const originalMessage = messages.value.get(id)
-					if (originalMessage) messages.value.set(id, { ...originalMessage, text, timestamp: Date.now() })
+					if (originalMessage) {
+						messages.value.set(id, { ...originalMessage, text, timestamp: Date.now()})
+						if (reasoning) messages.value.set(id, { ...originalMessage, reasoning })
+					}
 
 					console.log('[ChatStore] Message updated successfully:', { id })
 					resolve()

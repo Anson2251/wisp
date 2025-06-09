@@ -20,6 +20,8 @@ const notificationMessage = useMessage();
 
 const chatStore = inject("ChatStore") as ReturnType<typeof useChatStore>;
 
+(window as any).chatStore = chatStore
+
 const autoScrollWrapper = ref<typeof AutoScrollWrapper | null>(null);
 
 const props = defineProps({
@@ -169,6 +171,7 @@ onMounted(() => {
               v-for="(message, index) in chatStore.displayedMessage"
               :key="message.id"
               :text="message.text"
+              :reasoning="message.reasoning"
               :sender="message.sender"
               :timestamp="new Date(message.timestamp * 1000)"
               :id="message.id"
