@@ -1,16 +1,18 @@
-use std::sync::Mutex;
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 use crate::{
     cache::DiagramCacheEntry,
+    configs::provider,
+	configs::model,
     db::types::{Conversation, Message, ThreadTreeItem},
-    utils::compute_content_hash,
     inet::HttpClient,
+    types::AppData,
+    utils::compute_content_hash,
 };
 use serde_json::Value;
 use tauri::{AppHandle, Manager};
 
-use crate::types::AppData;
 use crate::utils::get_uuid_v4;
 
 // Content utilities
@@ -47,7 +49,7 @@ pub async fn clear_diagram_cache(app_handle: AppHandle) {
 pub async fn get_url(
     url: String,
     headers: Option<HashMap<String, String>>,
-    parse_json: bool
+    parse_json: bool,
 ) -> Result<serde_json::Value, String> {
     let client = HttpClient::new();
     client.get(url, headers, parse_json).await
@@ -58,7 +60,7 @@ pub async fn post_url(
     url: String,
     body: String,
     headers: Option<HashMap<String, String>>,
-    parse_json: bool
+    parse_json: bool,
 ) -> Result<serde_json::Value, String> {
     let client = HttpClient::new();
     client.post(url, body, headers, parse_json).await
@@ -66,40 +68,169 @@ pub async fn post_url(
 
 // API Key Management
 #[tauri::command]
-pub fn set_api_key(
-    app_handle: AppHandle,
-	name: String,
-    key: String
-) -> Result<(), String> {
+pub fn set_api_key(app_handle: AppHandle, name: String, key: String) -> Result<(), String> {
     let state = app_handle.state::<Mutex<AppData>>();
     let state = state.lock().unwrap();
-    state.key_manager.set_api_key(&name, &key)
+    state.key_manager.set_api_key(&name, &key).map_err(|x| x.to_string())
 }
 
 #[tauri::command]
-pub fn get_api_key(
-    app_handle: AppHandle,
-	name: String
-) -> Result<String, String> {
+pub fn get_api_key(app_handle: AppHandle, name: String) -> Result<String, String> {
     let state = app_handle.state::<Mutex<AppData>>();
     let state = state.lock().unwrap();
-    state.key_manager.get_api_key(&name)
+    state.key_manager.get_api_key(&name).map_err(|x| x.to_string())
 }
 
 #[tauri::command]
-pub fn delete_api_key(
+pub fn delete_api_key(app_handle: AppHandle, name: String) -> Result<(), String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+    state.key_manager.delete_api_key(&name).map_err(|x| x.to_string())
+}
+
+// Configs commands
+#[tauri::command]
+pub async fn configs_get_providers(
     app_handle: AppHandle,
-    name: String
+) -> Result<Vec<provider::Provider>, String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+    Ok(state.config_manager.get_providers())
+}
+
+#[tauri::command]
+pub async fn configs_get_provider(
+    app_handle: AppHandle,
+    name: String,
+) -> Result<Option<provider::Provider>, String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+    Ok(state.config_manager.get_provider(&name))
+}
+
+#[tauri::command]
+pub async fn configs_create_provider(
+    app_handle: AppHandle,
+    provider: provider::Provider,
 ) -> Result<(), String> {
     let state = app_handle.state::<Mutex<AppData>>();
-	let state = state.lock().unwrap();
-    state.key_manager.delete_api_key(&name)
+    let state = state.lock().unwrap();
+    state
+        .config_manager
+        .add_provider(provider)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn configs_update_provider(
+    app_handle: AppHandle,
+    name: String,
+    provider: provider::Provider,
+) -> Result<(), String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+    state
+        .config_manager
+        .update_provider(&name, provider)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn configs_delete_provider(app_handle: AppHandle, name: String) -> Result<(), String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+    state
+        .config_manager
+        .delete_provider(&name)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn configs_add_model(
+    app_handle: AppHandle,
+    provider_name: String,
+    model: model::Model,
+) -> Result<(), String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+    if let Some(provider) = state.config_manager.get_provider(&provider_name) {
+        let mut provider = provider.clone();
+        provider.add_model(model).map_err(|e| e.to_string())?;
+        state
+            .config_manager
+            .update_provider(&provider_name, provider)
+            .map_err(|e| e.to_string())
+    } else {
+        Err("Provider not found".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn configs_get_model(
+    app_handle: AppHandle,
+    provider_name: String,
+    model_name: String,
+) -> Result<Option<model::Model>, String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+    state
+        .config_manager
+        .get_provider(&provider_name)
+        .map(|p| p.get_model(&model_name).cloned())
+        .ok_or_else(|| "Provider not found".to_string())
+}
+
+#[tauri::command]
+pub async fn configs_update_model(
+    app_handle: AppHandle,
+    provider_name: String,
+    model_name: String,
+    model: model::Model,
+) -> Result<(), String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+    if let Some(provider) = state.config_manager.get_provider(&provider_name) {
+        let mut provider = provider.clone();
+        provider
+            .update_model(&model_name, model)
+            .map_err(|e| e.to_string())?;
+        state
+            .config_manager
+            .update_provider(&provider_name, provider)
+            .map_err(|e| e.to_string())
+    } else {
+        Err("Provider not found".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn configs_delete_model(
+    app_handle: AppHandle,
+    provider_name: String,
+    model_name: String,
+) -> Result<(), String> {
+    let state = app_handle.state::<Mutex<AppData>>();
+    let state = state.lock().unwrap();
+    if let Some(provider) = state.config_manager.get_provider(&provider_name) {
+        let mut provider = provider.clone();
+        provider
+            .delete_model(&model_name)
+            .map_err(|e| e.to_string())?;
+        state
+            .config_manager
+            .update_provider(&provider_name, provider)
+            .map_err(|e| e.to_string())
+    } else {
+        Err("Provider not found".to_string())
+    }
 }
 
 // OpenAI integration
 #[tauri::command]
 pub async fn ask_openai_stream(app_handle: AppHandle, messages: Vec<Value>) -> Result<(), String> {
-	crate::api::ask_openai_stream(app_handle, messages).await.map_err(|e| e.to_string())
+    crate::api::ask_openai_stream(app_handle, messages)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // Chat operations
@@ -125,7 +256,7 @@ pub async fn add_message(
     app_handle: AppHandle,
     conversation_id: String,
     text: String,
-	reasoning: Option<String>,
+    reasoning: Option<String>,
     sender: String,
     parent_id: Option<String>,
 ) -> Result<String, String> {
@@ -139,7 +270,7 @@ pub async fn add_message(
             &conversation_id,
             &message_id,
             &text,
-			reasoning.as_deref(),
+            reasoning.as_deref(),
             &sender,
             parent_id.as_deref(),
         )
@@ -152,7 +283,7 @@ pub async fn update_message(
     app_handle: AppHandle,
     message_id: String,
     text: String,
-	reasoning: Option<String>,
+    reasoning: Option<String>,
 ) -> Result<(), String> {
     let state = app_handle.state::<Mutex<AppData>>();
     let mut state = state.lock().unwrap();
@@ -160,22 +291,23 @@ pub async fn update_message(
         .chat
         .update_message(&message_id, &text)
         .map_err(|e| e.to_string())?;
-	if let Some(reasoning) = reasoning {
-        let _ = state.chat.messages_manager.update_reasoning(&message_id, &reasoning);
-	}
-	Ok(())
+    if let Some(reasoning) = reasoning {
+        let _ = state
+            .chat
+            .messages_manager
+            .update_reasoning(&message_id, &reasoning);
+    }
+    Ok(())
 }
 
 #[tauri::command]
-pub async fn get_message(
-    app_handle: AppHandle,
-    message_id: String,
-) -> Result<Message, String> {
+pub async fn get_message(app_handle: AppHandle, message_id: String) -> Result<Message, String> {
     let state = app_handle.state::<Mutex<AppData>>();
     let mut state = state.lock().unwrap();
     state
         .chat
-        .messages_manager.get(&message_id)
+        .messages_manager
+        .get(&message_id)
         .map_err(|e| e.to_string())
 }
 
@@ -209,16 +341,16 @@ pub async fn get_all_message_involved(
 
 #[tauri::command]
 pub async fn get_thread_tree(
-	app_handle: AppHandle,
-	conversation_id: String,
+    app_handle: AppHandle,
+    conversation_id: String,
 ) -> Result<Vec<ThreadTreeItem>, String> {
-	let state = app_handle.state::<Mutex<AppData>>();
-	let mut state = state.lock().unwrap();
+    let state = app_handle.state::<Mutex<AppData>>();
+    let mut state = state.lock().unwrap();
 
-	state
-		.chat
-		.get_thread_tree(&conversation_id)
-		.map_err(|e| e.to_string())
+    state
+        .chat
+        .get_thread_tree(&conversation_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -252,21 +384,29 @@ pub async fn delete_conversation(
 
 #[tauri::command]
 pub async fn update_conversation(
-	app_handle: AppHandle,
-	conversation_id: String,
-	name: Option<String>,
-	description: Option<String>,
+    app_handle: AppHandle,
+    conversation_id: String,
+    name: Option<String>,
+    description: Option<String>,
 ) -> Result<(), String> {
     let state = app_handle.state::<Mutex<AppData>>();
     let mut state = state.lock().unwrap();
 
-	if let Some(name) = name {
-		state.chat.conversation_manager.update_name(&conversation_id, &name).map_err(|e| e.to_string())?;
-	}
+    if let Some(name) = name {
+        state
+            .chat
+            .conversation_manager
+            .update_name(&conversation_id, &name)
+            .map_err(|e| e.to_string())?;
+    }
 
-	if let Some(description) = description {
-		state.chat.conversation_manager.update_description(&conversation_id, &description).map_err(|e| e.to_string())?;
-	}
+    if let Some(description) = description {
+        state
+            .chat
+            .conversation_manager
+            .update_description(&conversation_id, &description)
+            .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
