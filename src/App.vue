@@ -103,7 +103,7 @@ body {
 </style>
 
 <style scoped>
-.fade-enter-active,
+/* .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease-in-out;
 }
@@ -111,7 +111,7 @@ body {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
+} */
 
 .container {
   position: fixed;

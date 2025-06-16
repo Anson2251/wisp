@@ -36,19 +36,19 @@ impl Provider {
     }
 
     pub fn add_model(&mut self, model: Model) -> Result<(), ProviderError> {
-        if self.models.iter().any(|m| m.name == model.name) {
-            return Err(ProviderError::ModelAlreadyExistError(model.name.clone()));
+        if self.models.iter().any(|m| m.metadata.name == model.metadata.name) {
+            return Err(ProviderError::ModelAlreadyExistError(model.metadata.name.clone()));
         }
         self.models.push(model);
         Ok(())
     }
 
     pub fn get_model(&self, name: &str) -> Option<&Model> {
-        self.models.iter().find(|m| m.name == name)
+        self.models.iter().find(|m| m.metadata.name == name)
     }
 
     pub fn update_model(&mut self, name: &str, model: Model) -> Result<(), ProviderError> {
-        if let Some(index) = self.models.iter().position(|m| m.name == name) {
+        if let Some(index) = self.models.iter().position(|m| m.metadata.name == name) {
             self.models[index] = model;
             Ok(())
         } else {
@@ -57,7 +57,7 @@ impl Provider {
     }
 
     pub fn delete_model(&mut self, name: &str) -> Result<(), ProviderError> {
-        if let Some(index) = self.models.iter().position(|m| m.name == name) {
+        if let Some(index) = self.models.iter().position(|m| m.metadata.name == name) {
             self.models.remove(index);
             Ok(())
         } else {
