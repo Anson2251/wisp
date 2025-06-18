@@ -11,7 +11,7 @@ import {
   lightTheme,
 } from "naive-ui";
 import katex from "katex";
-import { provide, computed } from "vue";
+import { provide, computed, onMounted } from "vue";
 import {
   ChatMultiple24Regular,
   Bot24Regular,
@@ -21,20 +21,28 @@ import useHighlightjs from "./composables/useHighlightjs";
 const hljs = useHighlightjs();
 
 import { useOpenAI } from "./composables/useOpenAI";
-provide("OpenAI", useOpenAI());
+
+import { useMermaid } from "./composables/useMermaid";
+import { useVNodeRenderer } from "./composables/useMarkdown";
+import { useChatStore } from "./stores/chat";
+import { useProviderStore } from './stores/provider';
 
 const osThemeRef = useOsTheme();
 const isDark = computed(() => osThemeRef.value === "dark");
 const theme = computed(() => (isDark.value ? darkTheme : lightTheme));
 
-import { useMermaid } from "./composables/useMermaid";
-provide("MermaidRenderer", useMermaid());
+onMounted(() => {
+  (async () => {
+    provide("OpenAI", useOpenAI());
+    provide("MermaidRenderer", useMermaid());
+    provide("MarkdownRenderer", useVNodeRenderer());
+    provide("ChatStore", useChatStore());
+    const providerStore = useProviderStore();
+    provide("ProviderStore", providerStore);
+    providerStore.loadProviders()
+  })()
+})
 
-import { useVNodeRenderer } from "./composables/useMarkdown";
-provide("MarkdownRenderer", useVNodeRenderer());
-
-import { useChatStore } from "./stores/chat";
-provide("ChatStore", useChatStore());
 </script>
 
 <template>

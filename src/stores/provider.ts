@@ -57,11 +57,9 @@ export const useProviderStore = defineStore('provider', () => {
 			}
 			const updatedProvider = {
 				...provider,
-				...data,
-				models: provider.models
+				...data
 			}
 			await configsUpdateProvider(name, updatedProvider)
-
 		}
 		finally {
 			await loadProviders()

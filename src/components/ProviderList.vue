@@ -1,14 +1,14 @@
 <script lang="ts" setup>
 import { NButton, NInput, NModal, useMessage, useDialog, useThemeVars } from 'naive-ui'
-import { onMounted, ref } from 'vue'
+import { inject, ref } from 'vue'
 import { Menu, MenuItem } from '@tauri-apps/api/menu'
-import { useProviderStore } from '../stores/provider'
+import { useProviderStore } from '../stores/provider';
 import { Provider } from '../libs/types'
 
 const message = useMessage()
 const theme = useThemeVars()
 const dialog = useDialog()
-const providerStore = useProviderStore()
+const providerStore = inject('ProviderStore') as ReturnType<typeof useProviderStore>
 const showAddProvider = ref(false)
 const newProvider = ref({
   name: '',
@@ -16,10 +16,6 @@ const newProvider = ref({
   base_url: ''
 })
 const selectedProvider = ref<string | null>(null)
-
-onMounted(() => {
-  providerStore.loadProviders()
-})
 
 const handleAddProvider = async () => {
   try {
@@ -96,6 +92,8 @@ const showContextMenu = async (e: MouseEvent, provider: Provider) => {
           v-for="provider in providerStore.providers"
           :class="['provider-item', (selectedProvider === provider.name) ? 'selected' : '']"
           :key="provider.name"
+          :tabindex="0"
+          @keypress.enter="handleSelect(provider)"
           @click="handleSelect(provider)"
           @contextmenu="e => { e.preventDefault(); showContextMenu(e, provider) }"
         >
@@ -159,6 +157,9 @@ const showContextMenu = async (e: MouseEvent, provider: Provider) => {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+
+  padding: 8px;
+  box-sizing: border-box;
 }
 
 .provider-item {

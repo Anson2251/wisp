@@ -56,6 +56,7 @@ const props = defineProps<{
   hasPrevious?: boolean;
   hasNext?: boolean;
   culling?: boolean;
+  index?: number;
 }>();
 
 const emit = defineEmits<{
@@ -158,6 +159,11 @@ const showContextMenu = async (e: MouseEvent) => {
 const onReadyStatusChange = (ready: boolean) => {
   if (ready) emit("ready");
 };
+
+const thinkingPanelExpandedNames = ref<string[]>([]);
+if (!(props.over ?? true)) thinkingPanelExpandedNames.value.push("thinking");
+
+const footerVisible = ref(false);
 </script>
 
 <template>
@@ -167,17 +173,22 @@ const onReadyStatusChange = (ready: boolean) => {
       class="placeholder"
     ></div>
     <div v-else class="item-container">
-      <n-flex
-        align="start"
-        :wrap="false"
-        class="item-layout"
-      >
+      <n-flex align="start" :wrap="false" class="item-layout">
         <n-avatar class="avatar">
           <n-icon
             :component="sender === 'bot' ? Chat24Regular : Person24Regular"
           />
         </n-avatar>
-        <div class="message-bubble" :class="sender" :id="id">
+        <div
+          class="message-bubble"
+          :class="sender"
+          :id="id"
+          :tabindex="10"
+          @mouseenter="() => (footerVisible = true)"
+          @mouseleave="() => (footerVisible = false)"
+          @focusin="() => (footerVisible = true)"
+          @focusout="() => (footerVisible = false)"
+        >
           <div
             class="content-container"
             @contextmenu="
@@ -192,7 +203,7 @@ const onReadyStatusChange = (ready: boolean) => {
                 <n-collapse
                   arrow-placement="right"
                   display-directive="show"
-                  :default-expanded-names="isStreaming ? 'thinking' : undefined"
+                  v-model:expanded-names="thinkingPanelExpandedNames"
                 >
                   <n-collapse-item title="Thinking" name="thinking">
                     <MarkdownRenderer
@@ -211,7 +222,10 @@ const onReadyStatusChange = (ready: boolean) => {
               />
             </div>
           </div>
-          <div class="footer">
+          <div
+            class="footer"
+            :style="{ visibility: footerVisible ? 'visible' : 'hidden' }"
+          >
             <n-flex :wrap="false" align="center">
               <n-button-group class="button-group">
                 <n-button quaternary :onclick="copyMessage" size="tiny">
@@ -298,7 +312,9 @@ const onReadyStatusChange = (ready: boolean) => {
 }
 
 .item-layout {
-  flex-direction: v-bind('sender === "user" ? "row-reverse" : "row"') !important;
+  flex-direction: v-bind(
+    'sender === "user" ? "row-reverse" : "row"'
+  ) !important;
   align-items: flex-start;
   margin-bottom: 12px;
 }
@@ -317,12 +333,6 @@ const onReadyStatusChange = (ready: boolean) => {
   display: grid;
   grid-template-columns: auto;
   grid-template-rows: auto, auto;
-
-  --footer-buttons-visible: hidden;
-}
-
-.message-bubble:hover {
-  --footer-buttons-visible: auto;
 }
 
 .message-bubble.user {
@@ -404,8 +414,6 @@ const onReadyStatusChange = (ready: boolean) => {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-
-  visibility: var(--footer-buttons-visible);
 }
 
 .placeholder {

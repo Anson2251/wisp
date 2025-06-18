@@ -13,25 +13,36 @@ import {
   useMessage,
   useDialog,
 } from "naive-ui";
-import { Add20Regular, Delete16Regular, Edit16Regular } from "@vicons/fluent";
-import { ref, h, onMounted, watch } from "vue";
+import {
+  Add20Regular,
+  Delete16Regular,
+  Edit16Regular,
+  CubeSync20Regular,
+} from "@vicons/fluent";
+import { ref, h, onMounted, watch, inject } from "vue";
 import { Provider, Model } from "../libs/types";
-import { debounce } from "lodash";
+import { cloneDeep, debounce, isEqual } from "lodash";
 import { getCredential, setCredential } from "../libs/commands";
+import { useOpenAI } from "../composables/useOpenAI";
 import ModelForm from "./ModelForm.vue";
 import { useProviderStore } from "../stores/provider";
+import { uniqBy } from "lodash";
 
 const props = defineProps<{
   provider: Provider;
 }>();
 
 const dialog = useDialog();
-const providers = useProviderStore();
+const providers = inject("ProviderStore") as ReturnType<
+  typeof useProviderStore
+>;
 const message = useMessage();
+const { fetchModels } = useOpenAI();
+const isFetchingModels = ref(false);
 const showAddModel = ref(false);
 const showEditModel = ref(false);
 const selectedModel = ref<Model | null>(null);
-const providerForm = ref<Omit<Provider, "models">>({ ...props.provider });
+const providerForm = ref<Provider>(cloneDeep(props.provider));
 const apiKey = ref("");
 let storedApiKey: string | null = null;
 
@@ -124,9 +135,14 @@ const handleDeleteModel = async (modelName: string) => {
     const confirmed = await new Promise((resolve) => {
       dialog.warning({
         title: "Delete Model",
-        content: `Are you sure you want to delete the model "${props.provider.models.find(m => m.metadata.name === modelName)?.metadata.display_name || modelName}" in "${props.provider.display_name}" provider"? This process cannot be undone.`,
-        positiveText: 'Confirm',
-        negativeText: 'Cancel',
+        content: `Are you sure you want to delete the model "${
+          props.provider.models.find((m) => m.metadata.name === modelName)
+            ?.metadata.display_name || modelName
+        }" in "${
+          props.provider.display_name
+        }" provider"? This process cannot be undone.`,
+        positiveText: "Confirm",
+        negativeText: "Cancel",
         onPositiveClick: () => resolve(true),
         onNegativeClick: () => resolve(false),
       });
@@ -141,7 +157,26 @@ const handleDeleteModel = async (modelName: string) => {
   }
 };
 
-onMounted(async () => {
+const handleFetchModels = async () => {
+  isFetchingModels.value = true;
+  try {
+    const models = await fetchModels(providerForm.value.base_url, apiKey.value);
+    await providers.updateProvider(props.provider.name, {
+      ...providerForm.value,
+      models: uniqBy(
+        models.concat(props.provider.models),
+        (m) => m.metadata.name
+      ), // Concatenate new models
+    });
+    message.success(`Fetched ${models.length} models`);
+  } catch (error) {
+    message.error(`Failed to fetch models: ${error}`);
+  } finally {
+    isFetchingModels.value = false;
+  }
+};
+
+const loadApiKey = async () => {
   try {
     apiKey.value = await getCredential(props.provider.name);
     if (apiKey.value) {
@@ -150,13 +185,24 @@ onMounted(async () => {
   } catch (e) {
     console.error("Failed to load API key:", e);
   }
-});
+};
+
+onMounted(() => loadApiKey())
 
 watch(
   providerForm,
   debounce(() => {
-    handleUpdateProvider();
+    if (!isEqual(props.provider, providerForm.value)) handleUpdateProvider();
   }, 500),
+  { deep: true }
+);
+
+watch(
+  () => props.provider,
+  async () => {
+    providerForm.value = cloneDeep(props.provider);
+    loadApiKey()
+  },
   { deep: true }
 );
 </script>
@@ -165,7 +211,7 @@ watch(
   <div class="container">
     <n-space vertical>
       <!-- Provider Details -->
-      <n-card title="Provider Details" size="small" :bordered="false">
+      <n-card title="Provider Details" size="small">
         <n-form>
           <n-space
             horizontal
@@ -199,25 +245,41 @@ watch(
       </n-card>
 
       <!-- Model Management -->
-      <n-card title="Models" size="small" :bordered="false">
+      <n-card title="Models" size="small">
         <n-space vertical>
           <n-data-table
             :columns="modelColumns"
             :data="provider.models"
-            :bordered="false"
+            :bordered="true"
+            :max-height="400"
           />
         </n-space>
         <template #header-extra>
-          <n-button @click="() => {
-            showAddModel = true
-            selectedModel = null
-          }" tertiary circle>
-            <template #icon>
-              <n-icon :size="20">
-                <Add20Regular />
-              </n-icon>
-            </template>
-          </n-button>
+          <n-space>
+            <n-button
+              @click="
+                () => {
+                  showAddModel = true;
+                  selectedModel = null;
+                }
+              "
+              tertiary
+              circle
+            >
+              <template #icon>
+                <n-icon :size="20">
+                  <Add20Regular />
+                </n-icon>
+              </template>
+            </n-button>
+            <n-button @click="() => handleFetchModels()" tertiary circle>
+              <template #icon>
+                <n-icon :size="20">
+                  <CubeSync20Regular />
+                </n-icon>
+              </template>
+            </n-button>
+          </n-space>
         </template>
       </n-card>
 
@@ -235,7 +297,7 @@ watch(
         :width="600"
       >
         <n-drawer-content :title="showEditModel ? 'Edit Model' : 'Add Model'">
-          <ModelForm v-model:model="selectedModel" />
+          <model-form v-model:model="selectedModel" />
           <template #footer>
             <n-space horizontal>
               <n-button

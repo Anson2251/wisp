@@ -3,9 +3,8 @@ use std::sync::Mutex;
 
 use crate::{
     cache::DiagramCacheEntry,
-    configs::provider,
-	configs::model,
-    db::types::{Conversation, Message, ThreadTreeItem},
+    configs::{model, provider::{self, Provider}},
+	db::types::{Conversation, Message, ThreadTreeItem},
     inet::HttpClient,
     types::AppData,
     utils::compute_content_hash,
@@ -227,8 +226,13 @@ pub async fn configs_delete_model(
 
 // OpenAI integration
 #[tauri::command]
-pub async fn ask_openai_stream(app_handle: AppHandle, messages: Vec<Value>) -> Result<(), String> {
-    crate::api::ask_openai_stream(app_handle, messages)
+pub async fn ask_openai_stream(
+    app_handle: AppHandle,
+    messages: Vec<Value>,
+    model: String,
+	provider: Provider,
+) -> Result<(), String> {
+    crate::api::ask_openai_stream(app_handle, messages, model, provider)
         .await
         .map_err(|e| e.to_string())
 }

@@ -4,14 +4,17 @@ import {
   NButton,
   NEmpty,
   NIcon,
+  NSelect,
   useThemeVars,
   useMessage,
+  type SelectOption,
 } from "naive-ui";
-import { Chat48Regular } from "@vicons/fluent";
+import { Chat48Regular, Send20Regular } from "@vicons/fluent";
 import MessageBubble from "./MessageBubble.vue";
 import AutoScrollWrapper from "./AutoScrollWrapper.vue";
-import { ref, inject, watch, onMounted } from "vue";
+import { ref, inject, watch, onMounted, computed } from "vue";
 import { Message, MessageRole } from "../libs/types";
+import { useProviderStore } from "../stores/provider";
 import MessageBubbleEditor from "./MessageBubbleEditor.vue";
 import { useChatStore } from "../stores/chat";
 
@@ -19,8 +22,36 @@ const theme = useThemeVars();
 const notificationMessage = useMessage();
 
 const chatStore = inject("ChatStore") as ReturnType<typeof useChatStore>;
+const providerStore = inject("ProviderStore") as ReturnType<
+  typeof useProviderStore
+>;
 
-(window as any).chatStore = chatStore
+const providerOptions = computed<SelectOption[]>(() =>
+  providerStore.providers.map((p) => ({
+    label: p.display_name,
+    value: p.name,
+  }))
+);
+
+const modelOptions = computed<SelectOption[]>(
+  () =>
+    chatStore.chosenProvider?.models
+      .filter((m) => m.model_info.type === "text_generation")
+      .map((m) => ({
+        label: m.metadata.display_name,
+        value: m.metadata.name,
+      })) || []
+);
+
+const chosenProviderId = ref<string | null>(null);
+watch(chosenProviderId, (newId) => {
+  if (newId) {
+    chatStore.chosenProvider =
+      providerStore.providers.find((p) => p.name === newId) ?? null;
+  } else {
+    chatStore.chosenProvider = null;
+  }
+});
 
 const autoScrollWrapper = ref<typeof AutoScrollWrapper | null>(null);
 
@@ -160,14 +191,14 @@ onMounted(() => {
   <div style="height: 100%; width: 100%">
     <div v-if="chatStore.currentConversationId" class="chat-container">
       <div class="messages-container">
-        <AutoScrollWrapper
+        <auto-scroll-wrapper
           v-if="chatStore.displayedMessage.length > 0"
           ref="autoScrollWrapper"
           :auto="true"
           :smooth="true"
         >
           <div class="bubble-container">
-            <MessageBubble
+            <message-bubble
               v-for="(message, index) in chatStore.displayedMessage"
               :key="message.id"
               :text="message.text"
@@ -176,9 +207,12 @@ onMounted(() => {
               :timestamp="new Date(message.timestamp * 1000)"
               :id="message.id"
               :over="
-                index === chatStore.displayedMessage.length - 1 &&
-                !chatStore.isStreaming
+                !(
+                  index === chatStore.displayedMessage.length - 1 &&
+                  chatStore.isStreaming
+                )
               "
+              :index="index"
               :hasPrevious="message.hasPrevious"
               :hasNext="message.hasNext"
               :culling="useBubbleCulling"
@@ -189,7 +223,7 @@ onMounted(() => {
               @ready="() => (bubbleReadyCount += 1)"
             />
           </div>
-        </AutoScrollWrapper>
+        </auto-scroll-wrapper>
         <div v-else class="placeholder-container">
           <n-empty description="Let's chatting!">
             <template #icon>
@@ -204,15 +238,51 @@ onMounted(() => {
       </div>
 
       <div class="input-container">
-        <n-input
-          v-model:value="chatStore.userInput"
-          placeholder="Type your message..."
-          @keyup.enter="sendMessage"
-          clearable
-          round
-          type="textarea"
-        />
-        <n-button type="primary" @click="sendMessage" round>Send</n-button>
+        <n-space vertical>
+          <n-space justify="space-between" :wrap-items="false">
+            <n-space :wrap-items="false" align="center" size="small">
+              <n-select
+                v-model:value="chosenProviderId"
+                :options="providerOptions"
+                placeholder="Select provider"
+                :consistent-menu-width="false"
+                clearable
+                filterable
+                style="width: 8em;"
+              />
+              <span style="font-size: 1.5em;">/</span>
+              <n-select
+                v-model:value="chatStore.chosenModel"
+                :options="modelOptions"
+                placeholder="Select model"
+                :consistent-menu-width="false"
+                clearable
+                filterable
+                :disabled="!chatStore.chosenProvider"
+                style="min-width: 12em;"
+              />
+            </n-space>
+            <n-button
+              type="primary"
+              @click="sendMessage"
+              circle
+              :disabled="!chatStore.userInput || !chatStore.chosenModel"
+              ><template #icon>
+                <n-icon :size="20">
+                  <Send20Regular />
+                </n-icon>
+              </template>
+            </n-button>
+          </n-space>
+          <n-input
+            v-model:value="chatStore.userInput"
+            placeholder="Type your message..."
+            @keyup.enter="sendMessage"
+            clearable
+            round
+            type="textarea"
+          />
+        </n-space>
       </div>
     </div>
     <div v-else class="placeholder-container">
@@ -221,7 +291,7 @@ onMounted(() => {
         description="Select a conversation to start"
       />
     </div>
-    <MessageBubbleEditor
+    <message-bubble-editor
       v-model:show="showEditorModal"
       :id="messageEditingId ?? ''"
       @resend="

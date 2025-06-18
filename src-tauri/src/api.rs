@@ -14,15 +14,18 @@ use async_openai::{
 use futures::StreamExt;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter};
+use crate::{configs::provider::Provider};
 
-const URL_BASE: &str = "https://api.siliconflow.cn/v1/";
-const MODEL: &str = "Qwen/Qwen3-8B";
+use super::key_manager::KeyManager;
 
-/// Creates a configured OpenAI client for SiliconFlow API
-fn get_siliconflow_client() -> Result<Client<OpenAIConfig>, Box<dyn Error>> {
-    let api_key = std::env::var("OPENAI_API_KEY")?;
+
+/// Creates a configured OpenAI client with custom parameters
+fn get_openai_client(
+    base_url: String,
+    api_key: String,
+) -> Result<Client<OpenAIConfig>, Box<dyn Error>> {
     let config = OpenAIConfig::new()
-        .with_api_base(URL_BASE)
+        .with_api_base(base_url)
         .with_api_key(api_key);
     Ok(Client::with_config(config))
 }
@@ -67,17 +70,22 @@ fn convert_messages(
         .collect()
 }
 
-/// Streams chat completions from SiliconFlow API and emits chunks via Tauri
+/// Streams chat completions from OpenAI-compatible API and emits chunks via Tauri
 pub async fn ask_openai_stream(
     app_handle: AppHandle,
     messages: Vec<Value>,
+    model: String,
+	provider: Provider,
 ) -> Result<(), Box<dyn Error>> {
-	let client = get_siliconflow_client()?;
+	let base_url = provider.base_url;
+	let key_manager_local = KeyManager::new("wisp".to_string());
+	let api_key = key_manager_local.get_api_key(&provider.name).or_else(|_| std::env::var("OPENAI_API_KEY"))?;
+	let client = get_openai_client(base_url, api_key)?;
     let converted_messages = convert_messages(messages)?;
 
     let request = CreateChatCompletionRequestArgs::default()
         .max_tokens(1024u32)
-		.model(MODEL)
+		.model(model)
         .messages(converted_messages)
         .stream(true)
         .build()?;

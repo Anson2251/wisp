@@ -96,7 +96,9 @@ const showContextMenu = async (e: MouseEvent, conversation: any) => {
             'conversation-item',
             ...(chatStore.currentConversationId === conv.id ? ['selected'] : []),
           ]"
+          :tabindex="0"
           :key="conv.id"
+          @keypress.enter="handleSelect(conv.id)"
           @click="handleSelect(conv.id)"
           @contextmenu="
             (e) => {
@@ -152,7 +154,9 @@ const showContextMenu = async (e: MouseEvent, conversation: any) => {
 .conversation-list {
   flex-grow: 1;
   height: 100%;
-  overflow-y: auto;
+  padding: 8px;
+  box-sizing: border-box;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   flex-wrap: nowrap;

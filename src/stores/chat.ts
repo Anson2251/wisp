@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, watch, type ComputedRef, computed, reactive } from 'vue'
-import type { Message, Conversation } from '../libs/types'
+import type { Message, Conversation, Provider } from '../libs/types'
 import * as Commands from '../libs/commands'
 import MessageThreadTree from '../libs/message-thread-tree'
 import { MessageRole } from '../libs/types';
@@ -21,6 +21,8 @@ export const useChatStore = defineStore('chat', () => {
 	const threadTree = reactive<MessageThreadTree>(new MessageThreadTree())
 	const rootMessageId = ref<string | null>(null)
 	const conversations = ref<Conversation[]>([])
+	const chosenModel = ref<string | null>(null)
+	const chosenProvider = ref<Provider | null>(null)
 
 	const messages = ref<Map<string, Message>>(new Map())
 
@@ -62,6 +64,8 @@ export const useChatStore = defineStore('chat', () => {
 					role: msg.sender === "user" ? "user" : "assistant",
 					content: msg.text,
 				})),
+				chosenModel.value!,
+				chosenProvider.value!,
 				(chunk) => {
 					responseText += chunk;
 					updateBubbleText(responseText, false);
@@ -114,6 +118,8 @@ export const useChatStore = defineStore('chat', () => {
 					role: msg.sender === "user" ? "user" : "assistant",
 					content: msg.text,
 				})),
+				chosenModel.value!,
+				chosenProvider.value!,
 				(chunk) => {
 					responseText += chunk;
 					updateBubbleText(responseText, false);
@@ -478,6 +484,8 @@ export const useChatStore = defineStore('chat', () => {
 		threadTree,
 		userInput,
 		isStreaming,
+		chosenModel,
+		chosenProvider,
 		sendMessage,
 		regenerateMessage,
 		deriveMessage,

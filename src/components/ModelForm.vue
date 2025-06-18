@@ -18,9 +18,9 @@ import {
   TextGenerationParams,
 } from "../libs/types";
 
-defineProps<{ model: Model }>();
+defineProps<{ model: Model | null }>();
 
-const model = defineModel<Model>("model");
+const model = defineModel<Model | null>("model");
 
 const modelTypes = [
   { label: "Text Generation", value: "text_generation" },
@@ -43,6 +43,7 @@ const tokenizer = ref("");
 const max_input_size = ref(2048);
 const api_endpoint = ref("");
 const textCapabilities = ref<TextModelCapability[]>([]);
+
 onMounted(() => {
   if (model.value) {
     metadata.value = { ...model.value.metadata };
